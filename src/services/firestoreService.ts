@@ -5,6 +5,7 @@ import {
   getDocs, 
   doc, 
   updateDoc, 
+  deleteDoc,
   increment, 
   onSnapshot, 
   query, 
@@ -22,7 +23,8 @@ export const createIdea = async (idea: Omit<Idea, 'id' | 'createdAt'>, userId: s
     createdAt: Timestamp.now(),
     voteCount: 0,
     commentCount: 0,
-    totalPoints: 0
+    totalPoints: 0,
+    isFeatured: false
   };
   
   const docRef = await addDoc(collection(db, 'ideas'), ideaData);
@@ -38,6 +40,23 @@ export const getAllIdeas = async (): Promise<Idea[]> => {
     ...doc.data(),
     createdAt: doc.data().createdAt?.toDate()?.toISOString().split('T')[0] || new Date().toISOString().split('T')[0]
   })) as Idea[];
+};
+
+export const updateIdea = async (ideaId: string, updates: Partial<Idea>) => {
+  const ideaRef = doc(db, 'ideas', ideaId);
+  await updateDoc(ideaRef, updates);
+};
+
+export const deleteIdea = async (ideaId: string) => {
+  const ideaRef = doc(db, 'ideas', ideaId);
+  await deleteDoc(ideaRef);
+};
+
+export const toggleIdeaFeatured = async (ideaId: string, featured: boolean) => {
+  const ideaRef = doc(db, 'ideas', ideaId);
+  await updateDoc(ideaRef, {
+    isFeatured: featured
+  });
 };
 
 export const upvoteIdea = async (ideaId: string, userId: string) => {

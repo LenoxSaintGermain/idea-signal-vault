@@ -10,6 +10,7 @@ export interface Idea {
   createdAt: string;
   authorId: string;
   totalPoints: number;
+  isFeatured?: boolean;
   // Pain Point specific fields
   headline?: string;
   subheadline?: string;
