@@ -4,6 +4,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/hooks/useAuth';
 import { mockIdeas } from '@/data/mockData';
 import IdeaCard from './IdeaCard';
+import PainPointCard from './PainPointCard';
+import PainPointFormatter from './PainPointFormatter';
 import { Coins, TrendingUp, Lightbulb, Award } from 'lucide-react';
 import { useState } from 'react';
 import ROISimulator from './ROISimulator';
@@ -19,12 +21,15 @@ const Dashboard = () => {
     setIsROIOpen(true);
   };
 
+  const painPoints = mockIdeas.filter(idea => idea.isPainPoint);
+  const regularIdeas = mockIdeas.filter(idea => !idea.isPainPoint);
+
   // Mock recent activities
   const recentActivities = [
-    { action: 'Upvoted', idea: 'AI Agent for HOA Disputes', points: 1, time: '2 hours ago' },
-    { action: 'Commented on', idea: 'Carbon Credit Marketplace', points: 2, time: '1 day ago' },
-    { action: 'Detailed feedback', idea: 'Virtual Interior Design', points: 5, time: '2 days ago' },
-    { action: 'Enhancement accepted', idea: 'Micro-Investment Network', points: 10, time: '3 days ago' }
+    { action: 'Upvoted', idea: 'School pickup traffic orchestration', points: 2, time: '2 hours ago' },
+    { action: 'Commented on', idea: 'Contractor marketplace verification', points: 2, time: '1 day ago' },
+    { action: 'Detailed feedback', idea: 'Healthcare appointment tracking', points: 5, time: '2 days ago' },
+    { action: 'Enhancement accepted', idea: 'Local business micro-investing', points: 10, time: '3 days ago' }
   ];
 
   return (
@@ -81,35 +86,59 @@ const Dashboard = () => {
           </Card>
         </div>
 
-        <Tabs defaultValue="explore" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3 lg:w-auto lg:grid-cols-3">
-            <TabsTrigger value="explore">Explore Ideas</TabsTrigger>
+        <Tabs defaultValue="pain-points" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-5 lg:w-auto lg:grid-cols-5">
+            <TabsTrigger value="pain-points">Pain Points</TabsTrigger>
+            <TabsTrigger value="explore">Ideas</TabsTrigger>
+            <TabsTrigger value="formatter">AI Formatter</TabsTrigger>
             <TabsTrigger value="my-contributions">My Contributions</TabsTrigger>
-            <TabsTrigger value="activity">Recent Activity</TabsTrigger>
+            <TabsTrigger value="activity">Activity</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="explore" className="space-y-6">
+          <TabsContent value="pain-points" className="space-y-6">
             <div className="flex items-center justify-between">
-              <h2 className="text-2xl font-bold text-gray-900">Trending Ideas</h2>
-              <p className="text-gray-600">Discover and evaluate breakthrough concepts</p>
+              <h2 className="text-2xl font-bold text-gray-900">Problems Worth Solving</h2>
+              <p className="text-gray-600">Discover pain points that stop the scroll</p>
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {mockIdeas.map((idea) => (
+              {painPoints.map((idea) => (
+                <PainPointCard key={idea.id} idea={idea} onOpenROI={handleOpenROI} />
+              ))}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="explore" className="space-y-6">
+            <div className="flex items-center justify-between">
+              <h2 className="text-2xl font-bold text-gray-900">Traditional Ideas</h2>
+              <p className="text-gray-600">Standard idea format and evaluation</p>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {regularIdeas.map((idea) => (
                 <IdeaCard key={idea.id} idea={idea} onOpenROI={handleOpenROI} />
               ))}
             </div>
           </TabsContent>
 
+          <TabsContent value="formatter" className="space-y-6">
+            <div className="flex items-center justify-between">
+              <h2 className="text-2xl font-bold text-gray-900">AI Pain Point Formatter</h2>
+              <p className="text-gray-600">Transform raw ideas into viral pain points</p>
+            </div>
+            
+            <PainPointFormatter />
+          </TabsContent>
+
           <TabsContent value="my-contributions" className="space-y-6">
             <div className="flex items-center justify-between">
               <h2 className="text-2xl font-bold text-gray-900">Your Contributions</h2>
-              <p className="text-gray-600">Ideas you've supported and influenced</p>
+              <p className="text-gray-600">Pain points you've supported and influenced</p>
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {mockIdeas.slice(0, 3).map((idea) => (
-                <IdeaCard key={idea.id} idea={idea} onOpenROI={handleOpenROI} />
+              {painPoints.slice(0, 3).map((idea) => (
+                <PainPointCard key={idea.id} idea={idea} onOpenROI={handleOpenROI} />
               ))}
             </div>
           </TabsContent>
@@ -127,7 +156,7 @@ const Dashboard = () => {
                     <div key={index} className="flex items-center justify-between py-3 border-b last:border-b-0">
                       <div>
                         <p className="font-medium text-gray-900">
-                          {activity.action} <span className="text-purple-600">"{activity.idea}"</span>
+                          {activity.action} <span className="text-red-600">"{activity.idea}"</span>
                         </p>
                         <p className="text-sm text-gray-500">{activity.time}</p>
                       </div>

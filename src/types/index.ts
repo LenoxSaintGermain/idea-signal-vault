@@ -10,6 +10,13 @@ export interface Idea {
   createdAt: string;
   authorId: string;
   totalPoints: number;
+  // Pain Point specific fields
+  headline?: string;
+  subheadline?: string;
+  painPoint?: string;
+  solution?: string;
+  isPainPoint?: boolean;
+  cta?: string;
 }
 
 export interface User {
