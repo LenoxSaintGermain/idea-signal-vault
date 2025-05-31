@@ -6,11 +6,18 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { formatPainPoint } from '@/services/openaiService';
 import { toast } from '@/hooks/use-toast';
+import { mockIdeas } from '@/data/mockData';
+import { Idea } from '@/types';
 
-const PainPointFormatter = () => {
+interface PainPointFormatterProps {
+  onPainPointAdded?: () => void;
+}
+
+const PainPointFormatter = ({ onPainPointAdded }: PainPointFormatterProps) => {
   const [rawIdea, setRawIdea] = useState('');
   const [apiKey, setApiKey] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isAddingToGallery, setIsAddingToGallery] = useState(false);
   const [formattedResult, setFormattedResult] = useState(null);
 
   const handleFormat = async () => {
@@ -35,12 +42,14 @@ const PainPointFormatter = () => {
     setIsLoading(true);
     try {
       const result = await formatPainPoint(apiKey, rawIdea);
+      console.log('Formatted result from OpenAI:', result);
       setFormattedResult(result);
       toast({
         title: "Pain point formatted!",
         description: "Your idea has been transformed into a punchy pain point card",
       });
     } catch (error) {
+      console.error('Formatting error:', error);
       toast({
         title: "Formatting failed",
         description: error.message || "Failed to format the pain point",
@@ -48,6 +57,66 @@ const PainPointFormatter = () => {
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleAddToGallery = () => {
+    if (!formattedResult) return;
+
+    setIsAddingToGallery(true);
+    
+    try {
+      // Create new pain point entry
+      const newPainPoint: Idea = {
+        id: `user-${Date.now()}`,
+        headline: formattedResult.headline,
+        subheadline: formattedResult.subheadline,
+        title: formattedResult.headline, // Use headline as title
+        summary: formattedResult.solution,
+        painPoint: `Generated from user input: ${rawIdea}`,
+        solution: formattedResult.solution,
+        tags: formattedResult.tags || [],
+        valuationEstimate: Math.floor(Math.random() * 5000000) + 500000, // Random valuation
+        voteCount: 0,
+        commentCount: 0,
+        createdAt: new Date().toISOString().split('T')[0],
+        authorId: 'current-user',
+        totalPoints: 0,
+        isPainPoint: true,
+        cta: formattedResult.cta || 'Request Full Concept'
+      };
+
+      // Add to mock data (in a real app, this would be an API call)
+      mockIdeas.unshift(newPainPoint);
+
+      // Save to localStorage for persistence
+      const existingPainPoints = JSON.parse(localStorage.getItem('userPainPoints') || '[]');
+      existingPainPoints.unshift(newPainPoint);
+      localStorage.setItem('userPainPoints', JSON.stringify(existingPainPoints));
+
+      toast({
+        title: "Added to Gallery!",
+        description: "Your pain point has been added to the Pain Points gallery",
+      });
+
+      // Clear the form
+      setRawIdea('');
+      setFormattedResult(null);
+
+      // Notify parent component
+      if (onPainPointAdded) {
+        onPainPointAdded();
+      }
+
+    } catch (error) {
+      console.error('Error adding to gallery:', error);
+      toast({
+        title: "Failed to add",
+        description: "Could not add the pain point to the gallery",
+        variant: "destructive"
+      });
+    } finally {
+      setIsAddingToGallery(false);
     }
   };
 
@@ -140,9 +209,12 @@ const PainPointFormatter = () => {
 
             <div>
               <h4 className="font-semibold text-gray-900 mb-2">Solution:</h4>
-              <div className="p-3 bg-white rounded border border-red-200 cursor-pointer" onClick={() => copyToClipboard(formattedResult.solution)}>
-                <p className="text-gray-700">{formattedResult.solution}</p>
+              <div className="p-3 bg-white rounded border border-red-200 cursor-pointer" onClick={() => copyToClipboard(formattedResult.solution || 'No solution provided')}>
+                <p className="text-gray-700">{formattedResult.solution || 'No solution provided in response'}</p>
               </div>
+              {!formattedResult.solution && (
+                <p className="text-xs text-red-500 mt-1">Note: Solution field was not returned by the AI</p>
+              )}
             </div>
 
             <div className="flex gap-2 pt-4">
@@ -154,10 +226,12 @@ const PainPointFormatter = () => {
                 Copy JSON
               </Button>
               <Button
+                onClick={handleAddToGallery}
+                disabled={isAddingToGallery || !formattedResult.headline || !formattedResult.subheadline}
                 variant="outline"
-                className="flex-1 hover:bg-orange-50 hover:text-orange-700 hover:border-orange-200"
+                className="flex-1 hover:bg-orange-50 hover:text-orange-700 hover:border-orange-200 disabled:opacity-50"
               >
-                Add to Gallery
+                {isAddingToGallery ? 'Adding...' : 'Add to Gallery'}
               </Button>
             </div>
           </CardContent>

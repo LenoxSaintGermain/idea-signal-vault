@@ -7,7 +7,7 @@ import IdeaCard from './IdeaCard';
 import PainPointCard from './PainPointCard';
 import PainPointFormatter from './PainPointFormatter';
 import { Coins, TrendingUp, Lightbulb, Award } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import ROISimulator from './ROISimulator';
 import { Idea } from '@/types';
 
@@ -15,14 +15,34 @@ const Dashboard = () => {
   const { user } = useAuth();
   const [selectedIdea, setSelectedIdea] = useState<Idea | null>(null);
   const [isROIOpen, setIsROIOpen] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [activeTab, setActiveTab] = useState('pain-points');
 
   const handleOpenROI = (idea: Idea) => {
     setSelectedIdea(idea);
     setIsROIOpen(true);
   };
 
-  const painPoints = mockIdeas.filter(idea => idea.isPainPoint);
-  const regularIdeas = mockIdeas.filter(idea => !idea.isPainPoint);
+  const handlePainPointAdded = () => {
+    // Force a refresh of the pain points gallery
+    setRefreshKey(prev => prev + 1);
+    // Switch to pain points tab to show the new addition
+    setActiveTab('pain-points');
+  };
+
+  // Combine mock data with user-generated pain points from localStorage
+  const getUserPainPoints = () => {
+    try {
+      const userPainPoints = JSON.parse(localStorage.getItem('userPainPoints') || '[]');
+      return userPainPoints;
+    } catch {
+      return [];
+    }
+  };
+
+  const allIdeas = [...getUserPainPoints(), ...mockIdeas];
+  const painPoints = allIdeas.filter(idea => idea.isPainPoint);
+  const regularIdeas = allIdeas.filter(idea => !idea.isPainPoint);
 
   // Mock recent activities
   const recentActivities = [
@@ -86,7 +106,7 @@ const Dashboard = () => {
           </Card>
         </div>
 
-        <Tabs defaultValue="pain-points" className="space-y-6">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList className="grid w-full grid-cols-5 lg:w-auto lg:grid-cols-5">
             <TabsTrigger value="pain-points">Pain Points</TabsTrigger>
             <TabsTrigger value="explore">Ideas</TabsTrigger>
@@ -101,7 +121,7 @@ const Dashboard = () => {
               <p className="text-gray-600">Discover pain points that stop the scroll</p>
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div key={refreshKey} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {painPoints.map((idea) => (
                 <PainPointCard key={idea.id} idea={idea} onOpenROI={handleOpenROI} />
               ))}
@@ -127,7 +147,7 @@ const Dashboard = () => {
               <p className="text-gray-600">Transform raw ideas into viral pain points</p>
             </div>
             
-            <PainPointFormatter />
+            <PainPointFormatter onPainPointAdded={handlePainPointAdded} />
           </TabsContent>
 
           <TabsContent value="my-contributions" className="space-y-6">
