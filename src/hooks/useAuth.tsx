@@ -1,8 +1,9 @@
 
 import { createContext, useContext, useEffect, useState } from 'react';
-import { User as FirebaseUser, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from 'firebase/auth';
+import { User as FirebaseUser, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updateProfile } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { User } from '@/types';
+import { createUserProfile, getUserProfile, subscribeToUserProfile } from '@/services/userService';
 
 interface AuthContextType {
   user: User | null;
@@ -11,8 +12,6 @@ interface AuthContextType {
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, displayName: string) => Promise<void>;
   logout: () => Promise<void>;
-  mockLogin: () => void;
-  isMockMode: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -21,65 +20,61 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
   const [loading, setLoading] = useState(true);
-  const [isMockMode, setIsMockMode] = useState(false);
-
-  // Mock user data for testing
-  const mockUser: User = {
-    id: 'mock-user-123',
-    email: 'demo@signalvault.com',
-    displayName: 'Demo User',
-    signalPoints: 412,
-    ideasInfluenced: 7,
-    estimatedTake: 3280
-  };
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       setFirebaseUser(firebaseUser);
-      if (firebaseUser && !isMockMode) {
-        // Real Firebase user
-        setUser({
-          id: firebaseUser.uid,
-          email: firebaseUser.email || '',
-          displayName: firebaseUser.displayName || 'Anonymous',
-          signalPoints: 412,
-          ideasInfluenced: 7,
-          estimatedTake: 3280
+      
+      if (firebaseUser) {
+        // Get or create user profile in Firestore
+        let userProfile = await getUserProfile(firebaseUser.uid);
+        
+        if (!userProfile) {
+          userProfile = await createUserProfile(
+            firebaseUser.uid,
+            firebaseUser.email || '',
+            firebaseUser.displayName || 'Anonymous'
+          );
+        }
+        
+        setUser(userProfile);
+        
+        // Subscribe to real-time user profile updates
+        const unsubscribeProfile = subscribeToUserProfile(firebaseUser.uid, (updatedUser) => {
+          if (updatedUser) {
+            setUser(updatedUser);
+          }
         });
-      } else if (!isMockMode) {
+        
+        return () => unsubscribeProfile();
+      } else {
         setUser(null);
       }
+      
       setLoading(false);
     });
 
     return unsubscribe;
-  }, [isMockMode]);
+  }, []);
 
   const signIn = async (email: string, password: string) => {
     await signInWithEmailAndPassword(auth, email, password);
   };
 
   const signUp = async (email: string, password: string, displayName: string) => {
-    await createUserWithEmailAndPassword(auth, email, password);
+    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+    await updateProfile(userCredential.user, { displayName });
+    
+    // Create user profile in Firestore
+    await createUserProfile(userCredential.user.uid, email, displayName);
   };
 
   const logout = async () => {
-    if (isMockMode) {
-      setIsMockMode(false);
-      setUser(null);
-    } else {
-      await signOut(auth);
-    }
-  };
-
-  const mockLogin = () => {
-    setIsMockMode(true);
-    setUser(mockUser);
-    setLoading(false);
+    await signOut(auth);
   };
 
   return (
-    <AuthContext.Provider value={{ user, firebaseUser, loading, signIn, signUp, logout, mockLogin, isMockMode }}>
+    <AuthContext.Provider value={{ user, firebaseUser, loading, signIn, signUp, logout }}>
       {children}
     </AuthContext.Provider>
   );

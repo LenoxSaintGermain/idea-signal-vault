@@ -7,6 +7,8 @@ import { ArrowUp, MessageCircle, Calculator, TrendingUp } from 'lucide-react';
 import { Idea } from '@/types';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from '@/hooks/use-toast';
+import { upvoteIdea } from '@/services/firestoreService';
+import { updateUserStats } from '@/services/userService';
 
 interface IdeaCardProps {
   idea: Idea;
@@ -14,12 +16,12 @@ interface IdeaCardProps {
 }
 
 const IdeaCard = ({ idea, onOpenROI }: IdeaCardProps) => {
-  const { user } = useAuth();
+  const { user, firebaseUser } = useAuth();
   const [isUpvoted, setIsUpvoted] = useState(false);
-  const [voteCount, setVoteCount] = useState(idea.voteCount);
+  const [isUpvoting, setIsUpvoting] = useState(false);
 
-  const handleUpvote = () => {
-    if (!user) {
+  const handleUpvote = async () => {
+    if (!user || !firebaseUser) {
       toast({
         title: "Sign in required",
         description: "Please sign in to vote on ideas",
@@ -28,13 +30,29 @@ const IdeaCard = ({ idea, onOpenROI }: IdeaCardProps) => {
       return;
     }
 
-    setIsUpvoted(!isUpvoted);
-    setVoteCount(prev => isUpvoted ? prev - 1 : prev + 1);
-    
-    toast({
-      title: isUpvoted ? "Vote removed" : "Upvoted!",
-      description: isUpvoted ? "Your vote has been removed" : "+1 Signal Point earned",
-    });
+    if (isUpvoting) return;
+
+    setIsUpvoting(true);
+    try {
+      await upvoteIdea(idea.id, firebaseUser.uid);
+      await updateUserStats(firebaseUser.uid, 2);
+      
+      setIsUpvoted(!isUpvoted);
+      
+      toast({
+        title: "Upvoted!",
+        description: "+2 Signal Points earned",
+      });
+    } catch (error) {
+      console.error('Error upvoting:', error);
+      toast({
+        title: "Failed to upvote",
+        description: "Could not process your vote",
+        variant: "destructive"
+      });
+    } finally {
+      setIsUpvoting(false);
+    }
   };
 
   const formatValuation = (value: number) => {
@@ -74,7 +92,7 @@ const IdeaCard = ({ idea, onOpenROI }: IdeaCardProps) => {
           <div className="flex items-center space-x-4">
             <span className="flex items-center space-x-1">
               <ArrowUp className="w-4 h-4" />
-              <span>{voteCount}</span>
+              <span>{idea.voteCount}</span>
             </span>
             <span className="flex items-center space-x-1">
               <MessageCircle className="w-4 h-4" />
@@ -91,10 +109,11 @@ const IdeaCard = ({ idea, onOpenROI }: IdeaCardProps) => {
             onClick={handleUpvote}
             variant={isUpvoted ? "default" : "outline"}
             size="sm"
+            disabled={isUpvoting}
             className={`flex-1 ${isUpvoted ? 'bg-purple-600 hover:bg-purple-700' : 'hover:bg-purple-50 hover:text-purple-700 hover:border-purple-200'}`}
           >
             <ArrowUp className="w-4 h-4 mr-1" />
-            {isUpvoted ? 'Upvoted' : 'Upvote'}
+            {isUpvoting ? 'Voting...' : (isUpvoted ? 'Upvoted' : 'Upvote')}
           </Button>
           
           <Button

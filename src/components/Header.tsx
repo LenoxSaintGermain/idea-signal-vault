@@ -1,10 +1,10 @@
 
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
-import { TrendingUp, Coins, Lightbulb, Play } from 'lucide-react';
+import { TrendingUp, Coins, Lightbulb } from 'lucide-react';
 
 const Header = () => {
-  const { user, logout, isMockMode } = useAuth();
+  const { user, logout } = useAuth();
 
   return (
     <header className="bg-gradient-to-r from-slate-900 via-purple-900 to-slate-900 text-white shadow-lg">
@@ -14,17 +14,9 @@ const Header = () => {
             <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-blue-500 rounded-lg flex items-center justify-center">
               <TrendingUp className="w-6 h-6" />
             </div>
-            <div className="flex items-center space-x-2">
-              <h1 className="text-2xl font-bold bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
-                Signal Vault
-              </h1>
-              {isMockMode && (
-                <span className="bg-green-500/20 text-green-400 text-xs px-2 py-1 rounded-full border border-green-500/30 flex items-center space-x-1">
-                  <Play className="w-3 h-3" />
-                  <span>Demo</span>
-                </span>
-              )}
-            </div>
+            <h1 className="text-2xl font-bold bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
+              Signal Vault
+            </h1>
           </div>
 
           {user && (
@@ -45,7 +37,7 @@ const Header = () => {
                 </div>
               </div>
               <Button variant="outline" onClick={logout} className="text-white border-white/30 hover:bg-white/10">
-                {isMockMode ? 'Exit Demo' : 'Sign Out'}
+                Sign Out
               </Button>
             </div>
           )}

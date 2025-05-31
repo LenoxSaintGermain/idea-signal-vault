@@ -7,6 +7,8 @@ import { ArrowUp, Plus, X } from 'lucide-react';
 import { Idea } from '@/types';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from '@/hooks/use-toast';
+import { upvoteIdea } from '@/services/firestoreService';
+import { updateUserStats } from '@/services/userService';
 
 interface PainPointCardProps {
   idea: Idea;
@@ -14,13 +16,13 @@ interface PainPointCardProps {
 }
 
 const PainPointCard = ({ idea, onOpenROI }: PainPointCardProps) => {
-  const { user } = useAuth();
+  const { user, firebaseUser } = useAuth();
   const [isExpanded, setIsExpanded] = useState(false);
   const [isUpvoted, setIsUpvoted] = useState(false);
-  const [voteCount, setVoteCount] = useState(idea.voteCount);
+  const [isUpvoting, setIsUpvoting] = useState(false);
 
-  const handleUpvote = () => {
-    if (!user) {
+  const handleUpvote = async () => {
+    if (!user || !firebaseUser) {
       toast({
         title: "Sign in required",
         description: "Please sign in to vote on pain points",
@@ -29,13 +31,29 @@ const PainPointCard = ({ idea, onOpenROI }: PainPointCardProps) => {
       return;
     }
 
-    setIsUpvoted(!isUpvoted);
-    setVoteCount(prev => isUpvoted ? prev - 1 : prev + 1);
-    
-    toast({
-      title: isUpvoted ? "Vote removed" : "Upvoted!",
-      description: isUpvoted ? "Your vote has been removed" : "+2 Signal Points earned for pain point engagement",
-    });
+    if (isUpvoting) return;
+
+    setIsUpvoting(true);
+    try {
+      await upvoteIdea(idea.id, firebaseUser.uid);
+      await updateUserStats(firebaseUser.uid, 2);
+      
+      setIsUpvoted(!isUpvoted);
+      
+      toast({
+        title: "Upvoted!",
+        description: "+2 Signal Points earned for pain point engagement",
+      });
+    } catch (error) {
+      console.error('Error upvoting:', error);
+      toast({
+        title: "Failed to upvote",
+        description: "Could not process your vote",
+        variant: "destructive"
+      });
+    } finally {
+      setIsUpvoting(false);
+    }
   };
 
   const handleExpandToggle = () => {
@@ -100,7 +118,7 @@ const PainPointCard = ({ idea, onOpenROI }: PainPointCardProps) => {
             <div className="flex items-center space-x-4">
               <span className="flex items-center space-x-1">
                 <ArrowUp className="w-4 h-4" />
-                <span>{voteCount}</span>
+                <span>{idea.voteCount}</span>
               </span>
               <span>{idea.commentCount} comments</span>
             </div>
@@ -117,10 +135,11 @@ const PainPointCard = ({ idea, onOpenROI }: PainPointCardProps) => {
               }}
               variant={isUpvoted ? "default" : "outline"}
               size="sm"
+              disabled={isUpvoting}
               className={`flex-1 ${isUpvoted ? 'bg-red-600 hover:bg-red-700' : 'hover:bg-red-50 hover:text-red-700 hover:border-red-200'}`}
             >
               <ArrowUp className="w-4 h-4 mr-1" />
-              {isUpvoted ? 'Upvoted' : 'This Hurts'}
+              {isUpvoting ? 'Voting...' : (isUpvoted ? 'Upvoted' : 'This Hurts')}
             </Button>
             
             <Button

@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -6,7 +5,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { formatPainPoint } from '@/services/openaiService';
 import { toast } from '@/hooks/use-toast';
-import { mockIdeas } from '@/data/mockData';
+import { useAuth } from '@/hooks/useAuth';
+import { createIdea } from '@/services/firestoreService';
 import { Idea } from '@/types';
 
 interface PainPointFormatterProps {
@@ -14,6 +14,7 @@ interface PainPointFormatterProps {
 }
 
 const PainPointFormatter = ({ onPainPointAdded }: PainPointFormatterProps) => {
+  const { firebaseUser } = useAuth();
   const [rawIdea, setRawIdea] = useState('');
   const [apiKey, setApiKey] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -60,15 +61,14 @@ const PainPointFormatter = ({ onPainPointAdded }: PainPointFormatterProps) => {
     }
   };
 
-  const handleAddToGallery = () => {
-    if (!formattedResult) return;
+  const handleAddToGallery = async () => {
+    if (!formattedResult || !firebaseUser) return;
 
     setIsAddingToGallery(true);
     
     try {
       // Create new pain point entry
-      const newPainPoint: Idea = {
-        id: `user-${Date.now()}`,
+      const newPainPoint: Omit<Idea, 'id' | 'createdAt'> = {
         headline: formattedResult.headline,
         subheadline: formattedResult.subheadline,
         title: formattedResult.headline, // Use headline as title
@@ -79,24 +79,18 @@ const PainPointFormatter = ({ onPainPointAdded }: PainPointFormatterProps) => {
         valuationEstimate: Math.floor(Math.random() * 5000000) + 500000, // Random valuation
         voteCount: 0,
         commentCount: 0,
-        createdAt: new Date().toISOString().split('T')[0],
-        authorId: 'current-user',
+        authorId: firebaseUser.uid,
         totalPoints: 0,
         isPainPoint: true,
         cta: formattedResult.cta || 'Request Full Concept'
       };
 
-      // Add to mock data (in a real app, this would be an API call)
-      mockIdeas.unshift(newPainPoint);
-
-      // Save to localStorage for persistence
-      const existingPainPoints = JSON.parse(localStorage.getItem('userPainPoints') || '[]');
-      existingPainPoints.unshift(newPainPoint);
-      localStorage.setItem('userPainPoints', JSON.stringify(existingPainPoints));
+      // Save to Firestore
+      await createIdea(newPainPoint, firebaseUser.uid);
 
       toast({
         title: "Added to Gallery!",
-        description: "Your pain point has been added to the Pain Points gallery",
+        description: "Your pain point has been saved to the Pain Points gallery",
       });
 
       // Clear the form
@@ -227,7 +221,7 @@ const PainPointFormatter = ({ onPainPointAdded }: PainPointFormatterProps) => {
               </Button>
               <Button
                 onClick={handleAddToGallery}
-                disabled={isAddingToGallery || !formattedResult.headline || !formattedResult.subheadline}
+                disabled={isAddingToGallery || !formattedResult.headline || !formattedResult.subheadline || !firebaseUser}
                 variant="outline"
                 className="flex-1 hover:bg-orange-50 hover:text-orange-700 hover:border-orange-200 disabled:opacity-50"
               >
