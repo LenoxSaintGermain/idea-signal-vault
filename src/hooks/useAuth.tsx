@@ -11,6 +11,8 @@ interface AuthContextType {
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, displayName: string) => Promise<void>;
   logout: () => Promise<void>;
+  mockLogin: () => void;
+  isMockMode: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -19,12 +21,23 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isMockMode, setIsMockMode] = useState(false);
+
+  // Mock user data for testing
+  const mockUser: User = {
+    id: 'mock-user-123',
+    email: 'demo@signalvault.com',
+    displayName: 'Demo User',
+    signalPoints: 412,
+    ideasInfluenced: 7,
+    estimatedTake: 3280
+  };
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       setFirebaseUser(firebaseUser);
-      if (firebaseUser) {
-        // Mock user data - in real app, fetch from Firestore
+      if (firebaseUser && !isMockMode) {
+        // Real Firebase user
         setUser({
           id: firebaseUser.uid,
           email: firebaseUser.email || '',
@@ -33,14 +46,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           ideasInfluenced: 7,
           estimatedTake: 3280
         });
-      } else {
+      } else if (!isMockMode) {
         setUser(null);
       }
       setLoading(false);
     });
 
     return unsubscribe;
-  }, []);
+  }, [isMockMode]);
 
   const signIn = async (email: string, password: string) => {
     await signInWithEmailAndPassword(auth, email, password);
@@ -51,11 +64,22 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const logout = async () => {
-    await signOut(auth);
+    if (isMockMode) {
+      setIsMockMode(false);
+      setUser(null);
+    } else {
+      await signOut(auth);
+    }
+  };
+
+  const mockLogin = () => {
+    setIsMockMode(true);
+    setUser(mockUser);
+    setLoading(false);
   };
 
   return (
-    <AuthContext.Provider value={{ user, firebaseUser, loading, signIn, signUp, logout }}>
+    <AuthContext.Provider value={{ user, firebaseUser, loading, signIn, signUp, logout, mockLogin, isMockMode }}>
       {children}
     </AuthContext.Provider>
   );

@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from '@/hooks/use-toast';
-import { TrendingUp } from 'lucide-react';
+import { TrendingUp, Play } from 'lucide-react';
 
 const AuthForm = () => {
   const [isSignUp, setIsSignUp] = useState(false);
@@ -14,7 +14,7 @@ const AuthForm = () => {
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [loading, setLoading] = useState(false);
-  const { signIn, signUp } = useAuth();
+  const { signIn, signUp, mockLogin } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -45,6 +45,14 @@ const AuthForm = () => {
     }
   };
 
+  const handleMockLogin = () => {
+    mockLogin();
+    toast({
+      title: "Demo Mode Activated",
+      description: "You're now testing Signal Vault with mock data!",
+    });
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
@@ -67,6 +75,30 @@ const AuthForm = () => {
             </CardDescription>
           </CardHeader>
           <CardContent>
+            {/* Demo Mode Button */}
+            <div className="mb-6">
+              <Button 
+                onClick={handleMockLogin}
+                className="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white"
+                type="button"
+              >
+                <Play className="w-4 h-4 mr-2" />
+                Try Demo Mode
+              </Button>
+              <p className="text-xs text-gray-500 text-center mt-2">
+                Test the app with mock data - no signup required
+              </p>
+            </div>
+
+            <div className="relative mb-6">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-white px-2 text-gray-500">Or continue with email</span>
+              </div>
+            </div>
+
             <form onSubmit={handleSubmit} className="space-y-4">
               {isSignUp && (
                 <div>
