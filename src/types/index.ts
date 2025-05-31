@@ -26,6 +26,9 @@ export interface User {
   signalPoints: number;
   ideasInfluenced: number;
   estimatedTake: number;
+  isAdmin?: boolean;
+  joinedAt?: Date;
+  lastActive?: Date;
 }
 
 export interface Contribution {
@@ -43,4 +46,22 @@ export interface ROISimulation {
   equityOwned: number;
   estimatedExitValue: number;
   roi: number;
+}
+
+export interface AdminStats {
+  totalUsers: number;
+  totalIdeas: number;
+  totalPainPoints: number;
+  totalSignalPoints: number;
+  recentActivity: AdminActivity[];
+}
+
+export interface AdminActivity {
+  id: string;
+  userId: string;
+  userName: string;
+  action: string;
+  target: string;
+  timestamp: Date;
+  points?: number;
 }

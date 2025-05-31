@@ -1,7 +1,9 @@
 
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/hooks/useAuth';
-import { TrendingUp, Coins, Lightbulb } from 'lucide-react';
+import { TrendingUp, Coins, Lightbulb, Shield } from 'lucide-react';
+import { isAdmin } from '@/services/userService';
 
 const Header = () => {
   const { user, logout } = useAuth();
@@ -17,6 +19,12 @@ const Header = () => {
             <h1 className="text-2xl font-bold bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
               Signal Vault
             </h1>
+            {user && isAdmin(user) && (
+              <Badge className="bg-red-600 hover:bg-red-700 text-white">
+                <Shield className="w-3 h-3 mr-1" />
+                Admin
+              </Badge>
+            )}
           </div>
 
           {user && (

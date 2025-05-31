@@ -1,4 +1,3 @@
-
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/hooks/useAuth';
@@ -13,6 +12,8 @@ import { subscribeToIdeas } from '@/services/firestoreService';
 import { seedMockData } from '@/services/migrationService';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/hooks/use-toast';
+import AdminPanel from './AdminPanel';
+import { isAdmin } from '@/services/userService';
 
 const Dashboard = () => {
   const { user, firebaseUser } = useAuth();
@@ -152,12 +153,17 @@ const Dashboard = () => {
         )}
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5 lg:w-auto lg:grid-cols-5">
+          <TabsList className={`grid w-full ${isAdmin(user) ? 'grid-cols-6' : 'grid-cols-5'} lg:w-auto`}>
             <TabsTrigger value="pain-points">Pain Points</TabsTrigger>
             <TabsTrigger value="explore">Ideas</TabsTrigger>
             <TabsTrigger value="formatter">AI Formatter</TabsTrigger>
             <TabsTrigger value="my-contributions">My Contributions</TabsTrigger>
             <TabsTrigger value="activity">Activity</TabsTrigger>
+            {isAdmin(user) && (
+              <TabsTrigger value="admin" className="bg-red-50 text-red-700 data-[state=active]:bg-red-600 data-[state=active]:text-white">
+                Admin
+              </TabsTrigger>
+            )}
           </TabsList>
 
           <TabsContent value="pain-points" className="space-y-6">
@@ -241,6 +247,12 @@ const Dashboard = () => {
               </CardContent>
             </Card>
           </TabsContent>
+
+          {isAdmin(user) && (
+            <TabsContent value="admin" className="space-y-6">
+              <AdminPanel />
+            </TabsContent>
+          )}
         </Tabs>
       </div>
 
