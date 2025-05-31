@@ -1,11 +1,10 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Users, FileText, Zap, TrendingUp, Trash2, Edit, Star, RotateCcw, Database, AlertTriangle, CheckCircle } from 'lucide-react';
+import { Users, FileText, Zap, TrendingUp, Trash2, Edit, Star, RotateCcw, Database, AlertTriangle, Activity } from 'lucide-react';
 import { User, AdminStats, Idea } from '@/types';
 import { getAllUsers, getAdminStats } from '@/services/userService';
 import { getAllIdeas, deleteIdea, toggleIdeaFeatured } from '@/services/firestoreService';
@@ -13,6 +12,7 @@ import { seedMockData } from '@/services/migrationService';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from '@/hooks/use-toast';
 import EditIdeaDialog from './EditIdeaDialog';
+import ActivityFeed from './ActivityFeed';
 
 const AdminPanel = () => {
   const { firebaseUser } = useAuth();
@@ -211,9 +211,10 @@ const AdminPanel = () => {
 
       {/* Admin Tabs */}
       <Tabs defaultValue="users" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="users">User Management</TabsTrigger>
           <TabsTrigger value="content">Content Management</TabsTrigger>
+          <TabsTrigger value="activity">Live Activity</TabsTrigger>
           <TabsTrigger value="analytics">Analytics</TabsTrigger>
         </TabsList>
 
@@ -359,6 +360,47 @@ const AdminPanel = () => {
               </CardContent>
             </Card>
           </div>
+        </TabsContent>
+
+        <TabsContent value="activity" className="space-y-6">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold">Real-Time Platform Activity</h3>
+            <Badge className="bg-green-600">
+              <Activity className="w-3 h-3 mr-1" />
+              Live
+            </Badge>
+          </div>
+          
+          <ActivityFeed isAdminView={true} />
+
+          {stats?.recentActivity && stats.recentActivity.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Recent Admin Activity Summary</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {stats.recentActivity.slice(0, 10).map((activity) => (
+                    <div key={activity.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                      <div>
+                        <p className="font-medium text-sm">
+                          {activity.userName} {activity.action.toLowerCase()} "{activity.target}"
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          {activity.timestamp.toLocaleDateString()} at {activity.timestamp.toLocaleTimeString()}
+                        </p>
+                      </div>
+                      {activity.points && (
+                        <Badge className="bg-green-100 text-green-800">
+                          +{activity.points} pts
+                        </Badge>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         <TabsContent value="analytics" className="space-y-6">

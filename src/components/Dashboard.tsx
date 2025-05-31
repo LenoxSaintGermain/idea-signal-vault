@@ -1,9 +1,11 @@
+
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/hooks/useAuth';
 import IdeaCard from './IdeaCard';
 import PainPointCard from './PainPointCard';
 import PainPointFormatter from './PainPointFormatter';
+import ActivityFeed from './ActivityFeed';
 import { Coins, TrendingUp, Lightbulb, Award } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import ROISimulator from './ROISimulator';
@@ -65,14 +67,6 @@ const Dashboard = () => {
 
   const painPoints = ideas.filter(idea => idea.isPainPoint);
   const regularIdeas = ideas.filter(idea => !idea.isPainPoint);
-
-  // Mock recent activities - will be replaced with real data later
-  const recentActivities = [
-    { action: 'Upvoted', idea: 'School pickup traffic orchestration', points: 2, time: '2 hours ago' },
-    { action: 'Commented on', idea: 'Contractor marketplace verification', points: 2, time: '1 day ago' },
-    { action: 'Detailed feedback', idea: 'Healthcare appointment tracking', points: 5, time: '2 days ago' },
-    { action: 'Enhancement accepted', idea: 'Local business micro-investing', points: 10, time: '3 days ago' }
-  ];
 
   if (loading) {
     return (
@@ -226,26 +220,7 @@ const Dashboard = () => {
               <p className="text-gray-600">Your Signal Point earning history</p>
             </div>
             
-            <Card>
-              <CardContent className="p-6">
-                <div className="space-y-4">
-                  {recentActivities.map((activity, index) => (
-                    <div key={index} className="flex items-center justify-between py-3 border-b last:border-b-0">
-                      <div>
-                        <p className="font-medium text-gray-900">
-                          {activity.action} <span className="text-red-600">"{activity.idea}"</span>
-                        </p>
-                        <p className="text-sm text-gray-500">{activity.time}</p>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <span className="text-green-600 font-semibold">+{activity.points}</span>
-                        <Coins className="w-4 h-4 text-yellow-500" />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
+            <ActivityFeed />
           </TabsContent>
 
           {isAdmin(user) && (

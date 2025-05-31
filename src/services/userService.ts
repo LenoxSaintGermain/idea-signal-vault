@@ -15,6 +15,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { User, AdminStats, AdminActivity } from '@/types';
+import { getAllActivities } from './firestoreService';
 
 const ADMIN_EMAIL = 'lenox.paris@outlook.com';
 
@@ -57,14 +58,17 @@ export const updateUserStats = async (userId: string, points: number) => {
 
 export const getUserContributions = async (userId: string) => {
   const q = query(
-    collection(db, 'user_contributions'), 
-    where('userId', '==', userId)
+    collection(db, 'user_activities'), 
+    where('userId', '==', userId),
+    orderBy('timestamp', 'desc'),
+    limit(50)
   );
   const querySnapshot = await getDocs(q);
   
   return querySnapshot.docs.map(doc => ({
     id: doc.id,
-    ...doc.data()
+    ...doc.data(),
+    timestamp: doc.data().timestamp?.toDate()?.toISOString() || new Date().toISOString()
   }));
 };
 
@@ -107,8 +111,32 @@ export const getAdminStats = async (): Promise<AdminStats> => {
     return total + (doc.data().signalPoints || 0);
   }, 0);
 
-  // Get recent activity (mock for now - will implement real activity tracking later)
-  const recentActivity: AdminActivity[] = [];
+  // Get real recent activity
+  const activitiesData = await getAllActivities(10);
+  const usersData = usersSnapshot.docs.reduce((acc, doc) => {
+    acc[doc.id] = doc.data();
+    return acc;
+  }, {} as Record<string, any>);
+
+  const ideasData = ideasSnapshot.docs.reduce((acc, doc) => {
+    acc[doc.id] = doc.data();
+    return acc;
+  }, {} as Record<string, any>);
+
+  const recentActivity: AdminActivity[] = activitiesData.map((activity, index) => {
+    const user = usersData[activity.userId];
+    const idea = ideasData[activity.ideaId];
+    
+    return {
+      id: activity.id || `activity-${index}`,
+      userId: activity.userId,
+      userName: user?.displayName || 'Unknown User',
+      action: getActionDescription(activity.action),
+      target: idea?.title || idea?.headline || 'Unknown Idea',
+      timestamp: new Date(activity.timestamp),
+      points: activity.points
+    };
+  });
 
   return {
     totalUsers,
@@ -117,6 +145,17 @@ export const getAdminStats = async (): Promise<AdminStats> => {
     totalSignalPoints,
     recentActivity
   };
+};
+
+const getActionDescription = (action: string): string => {
+  switch (action) {
+    case 'upvote': return 'Upvoted';
+    case 'comment': return 'Commented on';
+    case 'detailed_feedback': return 'Provided detailed feedback on';
+    case 'enhancement_accepted': return 'Enhancement accepted for';
+    case 'idea_submission': return 'Submitted';
+    default: return 'Interacted with';
+  }
 };
 
 export const isAdmin = (user: User | null): boolean => {
