@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useState, useRef } from 'react';
 import { User as FirebaseUser, onAuthStateChanged } from 'firebase/auth';
 import { auth, getFirebaseConnectionState } from '@/lib/firebase';
 import { User } from '@/types';
@@ -27,6 +27,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
   const [loading, setLoading] = useState(true);
+  const profileSubscriptionRef = useRef<(() => void) | null>(null);
   
   const { 
     connectionStatus, 
@@ -39,7 +40,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   
   const { signIn, signUp, logout } = useAuthOperations(setConnectionStatus, setLastError);
 
-  // Load cached user data immediately for faster initial load
+  // Load cached user data immediately
   useEffect(() => {
     const cachedUser = loadCachedUserData();
     if (cachedUser) {
@@ -48,28 +49,20 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   }, []);
 
-  // Enhanced profile loading with better fallback mechanisms
-  const loadUserProfile = async (firebaseUser: FirebaseUser, allowCache = true): Promise<User | null> => {
-    const profileStart = performance.now();
+  // Enhanced profile loading with better error handling
+  const loadUserProfile = async (firebaseUser: FirebaseUser): Promise<User | null> => {
     console.log('📊 Loading user profile for:', firebaseUser.uid);
     
-    // Check cache first if allowed
-    if (allowCache) {
-      const cachedProfile = getCachedUser(firebaseUser.uid);
-      if (cachedProfile) {
-        console.log('⚡ Using cached user profile');
-        return cachedProfile;
-      }
+    // Check cache first
+    const cachedProfile = getCachedUser(firebaseUser.uid);
+    if (cachedProfile) {
+      console.log('⚡ Using cached user profile');
+      return cachedProfile;
     }
     
-    console.log('💾 User profile not in cache, fetching from Firestore');
-    
-    // Check Firebase connection state
-    const firebaseState = getFirebaseConnectionState();
-    console.log('🔥 Firebase state during profile load:', firebaseState);
+    console.log('💾 Fetching profile from Firestore');
     
     try {
-      // Try to fetch with enhanced retry logic
       const userProfile = await retryWithBackoff(async () => {
         const profile = await getUserProfile(firebaseUser.uid);
         
@@ -83,52 +76,70 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         }
         
         return profile;
-      }, 2); // Reduced retries for faster fallback
+      }, 2);
       
-      // Cache the profile
       setCachedUser(firebaseUser.uid, userProfile);
-      console.log(`📊 Profile loaded in ${(performance.now() - profileStart).toFixed(0)}ms`);
       return userProfile;
       
     } catch (error) {
       console.error('❌ Error loading user profile:', error);
       
-      // Enhanced fallback: try cached data even if it wasn't initially found
+      // Fallback to cached data
       const fallbackCachedUser = loadCachedUserData();
       if (fallbackCachedUser && fallbackCachedUser.id === firebaseUser.uid) {
-        console.log('💾 Using cached user data as fallback after error');
+        console.log('💾 Using cached user data as fallback');
         return fallbackCachedUser;
       }
       
-      // If offline, create minimal profile from Firebase user data
-      if (!navigator.onLine || !firebaseState.isOnline) {
-        console.log('🔌 Creating offline fallback profile');
-        const offlineProfile: User = {
-          id: firebaseUser.uid,
-          email: firebaseUser.email || '',
-          displayName: firebaseUser.displayName || 'Anonymous',
-          signalPoints: 0,
-          ideasInfluenced: 0,
-          estimatedTake: 0,
-          isAdmin: false,
-          joinedAt: new Date(),
-          lastActive: new Date()
-        };
-        
-        // Cache the offline profile
-        setCachedUser(firebaseUser.uid, offlineProfile);
-        return offlineProfile;
-      }
+      // Create offline fallback profile
+      const offlineProfile: User = {
+        id: firebaseUser.uid,
+        email: firebaseUser.email || '',
+        displayName: firebaseUser.displayName || 'Anonymous',
+        signalPoints: 0,
+        ideasInfluenced: 0,
+        estimatedTake: 0,
+        isAdmin: false,
+        joinedAt: new Date(),
+        lastActive: new Date()
+      };
       
-      throw error;
+      setCachedUser(firebaseUser.uid, offlineProfile);
+      return offlineProfile;
+    }
+  };
+
+  // Setup real-time subscription with proper cleanup
+  const setupProfileSubscription = (uid: string) => {
+    // Clean up existing subscription
+    if (profileSubscriptionRef.current) {
+      profileSubscriptionRef.current();
+      profileSubscriptionRef.current = null;
+    }
+
+    try {
+      console.log('🔔 Setting up real-time profile subscription');
+      const unsubscribe = subscribeToUserProfile(uid, (updatedUser) => {
+        if (updatedUser) {
+          console.log('🔄 Real-time profile update received');
+          setCachedUser(uid, updatedUser);
+          setUser(updatedUser);
+        }
+      });
+      
+      profileSubscriptionRef.current = unsubscribe;
+    } catch (error) {
+      console.warn('🔔 Failed to set up real-time subscription:', error);
     }
   };
 
   useEffect(() => {
     console.log('🔄 Setting up Firebase auth state listener');
-    const authStart = performance.now();
+    let mounted = true;
 
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (!mounted) return;
+      
       console.log('🔐 Auth state changed:', firebaseUser ? 'User signed in' : 'User signed out');
       setFirebaseUser(firebaseUser);
       
@@ -138,66 +149,54 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           
           const userProfile = await loadUserProfile(firebaseUser);
           
+          if (!mounted) return;
+          
           if (userProfile) {
             setUser(userProfile);
-            setConnectionStatus('online');
-            setLastError(null);
+            setConnectionStatus('online', null);
             
-            // Set up real-time subscription after successful profile load
+            // Set up subscription after a brief delay to avoid conflicts
             setTimeout(() => {
-              try {
-                console.log('🔔 Setting up real-time profile subscription');
-                const unsubscribeProfile = subscribeToUserProfile(firebaseUser.uid, (updatedUser) => {
-                  if (updatedUser) {
-                    console.log('🔄 Real-time profile update received');
-                    setCachedUser(firebaseUser.uid, updatedUser);
-                    setUser(updatedUser);
-                    setConnectionStatus('online');
-                    setLastError(null);
-                  }
-                });
-                
-                return () => {
-                  console.log('🛑 Cleaning up profile subscription');
-                  unsubscribeProfile();
-                };
-              } catch (error) {
-                console.warn('🔔 Failed to set up real-time subscription:', error);
-                // Don't set error for subscription failures if we have the profile
+              if (mounted) {
+                setupProfileSubscription(firebaseUser.uid);
               }
-            }, 100);
+            }, 500);
           } else {
             throw new Error('Failed to load or create user profile');
           }
           
         } catch (error) {
+          if (!mounted) return;
           console.error('❌ Error in auth state change handler:', error);
-          setConnectionStatus('error');
-          setLastError('Profile loading failed - using offline mode');
+          setConnectionStatus('error', 'Profile loading failed - using offline mode');
           
-          // Final fallback: keep any existing user data
+          // Keep existing cached user data if available
           const existingCachedUser = loadCachedUserData();
           if (existingCachedUser && existingCachedUser.id === firebaseUser.uid) {
-            console.log('💾 Keeping existing cached user data');
             setUser(existingCachedUser);
-          } else {
-            setUser(null);
           }
         }
       } else {
+        // Clean up subscription on logout
+        if (profileSubscriptionRef.current) {
+          profileSubscriptionRef.current();
+          profileSubscriptionRef.current = null;
+        }
         setUser(null);
-        setConnectionStatus('offline');
-        setLastError(null);
+        setConnectionStatus('offline', null);
       }
       
       setLoading(false);
-      const totalTime = performance.now() - authStart;
-      console.log(`🎉 Auth state processing completed in ${totalTime.toFixed(0)}ms`);
     });
 
     return () => {
+      mounted = false;
       console.log('🛑 Cleaning up auth listener');
       unsubscribe();
+      if (profileSubscriptionRef.current) {
+        profileSubscriptionRef.current();
+        profileSubscriptionRef.current = null;
+      }
     };
   }, [setConnectionStatus, setLastError]);
 

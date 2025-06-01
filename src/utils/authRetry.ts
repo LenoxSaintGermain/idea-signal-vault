@@ -1,21 +1,19 @@
 
 import { categorizeFirebaseError, getFirebaseConnectionState } from '@/lib/firebase';
 
-// Enhanced retry logic with Firebase state awareness and exponential backoff
-export const retryWithBackoff = async (fn: () => Promise<any>, maxRetries = 3) => {
+// Enhanced retry logic with exponential backoff and Firebase state awareness
+export const retryWithBackoff = async (fn: () => Promise<any>, maxRetries = 2) => {
   for (let i = 0; i < maxRetries; i++) {
     try {
       return await fn();
     } catch (error) {
       const errorType = categorizeFirebaseError(error);
-      const firebaseState = getFirebaseConnectionState();
       
       console.log(`🔄 Retry attempt ${i + 1}/${maxRetries} failed (${errorType}):`, error);
-      console.log('🔥 Firebase state during retry:', firebaseState);
       
-      // Don't retry auth errors or permission errors
-      if (errorType === 'auth' || errorType === 'permission') {
-        console.log('🚫 Not retrying auth/permission error');
+      // Don't retry auth errors, permission errors, or quota errors
+      if (errorType === 'auth' || errorType === 'permission' || errorType === 'quota') {
+        console.log('🚫 Not retrying auth/permission/quota error');
         throw error;
       }
       
@@ -25,20 +23,14 @@ export const retryWithBackoff = async (fn: () => Promise<any>, maxRetries = 3) =
         throw error;
       }
       
-      // Don't retry if Firebase is definitely offline
-      if (!firebaseState.isOnline && !firebaseState.hasPersistence) {
-        console.log('🔥 Firebase offline without persistence, not retrying');
-        throw error;
-      }
-      
       if (i === maxRetries - 1) {
         console.log('🔄 Max retries reached, throwing error');
         throw error;
       }
       
-      // Exponential backoff: 1s, 2s, 4s with jitter
-      const baseDelay = Math.pow(2, i) * 1000;
-      const jitter = Math.random() * 500; // Add up to 500ms jitter
+      // Exponential backoff: 1s, 3s with jitter
+      const baseDelay = Math.pow(3, i) * 1000;
+      const jitter = Math.random() * 500;
       const delay = baseDelay + jitter;
       
       console.log(`⏳ Waiting ${delay.toFixed(0)}ms before retry ${i + 2}`);

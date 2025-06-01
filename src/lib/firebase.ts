@@ -1,4 +1,3 @@
-
 import { initializeApp } from 'firebase/app';
 import { getAuth, connectAuthEmulator } from 'firebase/auth';
 import { getFirestore, connectFirestoreEmulator, enableNetwork, disableNetwork, enableIndexedDbPersistence } from 'firebase/firestore';
@@ -23,9 +22,11 @@ export const auth = getAuth(app);
 // Initialize Firestore with enhanced configuration and offline persistence
 export const db = getFirestore(app);
 
-// Firebase connection state
+// Firebase connection state with better management
 let isFirebaseOnline = true;
 let persistenceEnabled = false;
+let lastConnectionCheck = 0;
+const CONNECTION_CHECK_COOLDOWN = 10000; // 10 seconds cooldown
 
 // Enable offline persistence
 const enableOfflinePersistence = async () => {
@@ -91,16 +92,26 @@ export const disableFirestoreNetwork = async () => {
   }
 };
 
-// Enhanced connection health checker with Firebase state awareness
+// Optimized connection health checker with cooldown
 export const checkFirebaseConnection = async (): Promise<boolean> => {
+  const now = Date.now();
+  
+  // Respect cooldown to prevent excessive checks
+  if (now - lastConnectionCheck < CONNECTION_CHECK_COOLDOWN) {
+    console.log('🔥 Using cached connection status (cooldown active)');
+    return isFirebaseOnline;
+  }
+  
+  lastConnectionCheck = now;
+  
   try {
-    // Test both network and Firebase client state
     if (!navigator.onLine) {
       console.log('🌐 Browser offline');
+      isFirebaseOnline = false;
       return false;
     }
     
-    // Simple connectivity test
+    // Quick connectivity test
     await enableNetwork(db);
     isFirebaseOnline = true;
     console.log('✅ Firebase connection verified');

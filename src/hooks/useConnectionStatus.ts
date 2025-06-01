@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { checkFirebaseConnection, getFirebaseConnectionState } from '@/lib/firebase';
 
 export type ConnectionStatus = 'online' | 'offline' | 'connecting' | 'error';
@@ -7,99 +7,93 @@ export type ConnectionStatus = 'online' | 'offline' | 'connecting' | 'error';
 export const useConnectionStatus = () => {
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('connecting');
   const [lastError, setLastError] = useState<string | null>(null);
+  const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const lastStatusChangeRef = useRef<number>(0);
 
-  // Enhanced network connectivity detection with Firebase state monitoring
+  // Debounce status changes to prevent rapid state changes
+  const debouncedSetStatus = (status: ConnectionStatus, error?: string | null) => {
+    const now = Date.now();
+    if (now - lastStatusChangeRef.current < 1000) return; // Debounce 1 second
+    
+    lastStatusChangeRef.current = now;
+    setConnectionStatus(status);
+    if (error !== undefined) setLastError(error);
+  };
+
   useEffect(() => {
+    let mounted = true;
+
     const handleOnline = async () => {
+      if (!mounted) return;
       console.log('🌐 Network back online');
-      setConnectionStatus('connecting');
+      debouncedSetStatus('connecting');
       
-      // Test Firebase connection with retry
-      let attempts = 0;
-      const maxAttempts = 3;
-      
-      while (attempts < maxAttempts) {
+      try {
         const isConnected = await checkFirebaseConnection();
-        if (isConnected) {
-          setConnectionStatus('online');
-          setLastError(null);
-          return;
-        }
+        if (!mounted) return;
         
-        attempts++;
-        if (attempts < maxAttempts) {
-          console.log(`🔄 Firebase connection attempt ${attempts}/${maxAttempts} failed, retrying...`);
-          await new Promise(resolve => setTimeout(resolve, 1000 * attempts));
+        if (isConnected) {
+          debouncedSetStatus('online', null);
+        } else {
+          debouncedSetStatus('error', 'Firebase connection failed');
         }
+      } catch (error) {
+        if (!mounted) return;
+        debouncedSetStatus('error', 'Connection test failed');
       }
-      
-      setConnectionStatus('error');
-      setLastError('Unable to connect to Firebase services after multiple attempts');
     };
     
     const handleOffline = () => {
+      if (!mounted) return;
       console.log('🌐 Network went offline');
-      setConnectionStatus('offline');
-      setLastError('No internet connection');
-    };
-
-    // Firebase state monitoring
-    const monitorFirebaseState = () => {
-      const firebaseState = getFirebaseConnectionState();
-      console.log('🔥 Firebase state:', firebaseState);
-      
-      if (!firebaseState.browserOnline) {
-        setConnectionStatus('offline');
-        setLastError('No internet connection');
-      } else if (!firebaseState.isOnline) {
-        setConnectionStatus('error');
-        setLastError('Firebase connection lost');
-      }
+      debouncedSetStatus('offline', 'No internet connection');
     };
 
     // Set up event listeners
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
 
-    // Monitor Firebase state periodically
-    const firebaseMonitor = setInterval(monitorFirebaseState, 5000);
-
     // Initial connection check
     if (!navigator.onLine) {
-      setConnectionStatus('offline');
-      setLastError('No internet connection');
+      debouncedSetStatus('offline', 'No internet connection');
     } else {
       handleOnline();
     }
 
     return () => {
+      mounted = false;
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
-      clearInterval(firebaseMonitor);
+      if (retryTimeoutRef.current) {
+        clearTimeout(retryTimeoutRef.current);
+      }
     };
   }, []);
 
   const retryConnection = async () => {
     console.log('🔄 Manual connection retry triggered');
-    setConnectionStatus('connecting');
-    setLastError(null);
     
-    const firebaseState = getFirebaseConnectionState();
-    console.log('🔥 Firebase state before retry:', firebaseState);
+    // Clear any existing retry timeout
+    if (retryTimeoutRef.current) {
+      clearTimeout(retryTimeoutRef.current);
+    }
+    
+    debouncedSetStatus('connecting', null);
     
     if (!navigator.onLine) {
-      setConnectionStatus('offline');
-      setLastError('No internet connection');
+      debouncedSetStatus('offline', 'No internet connection');
       return;
     }
     
-    const isConnected = await checkFirebaseConnection();
-    if (isConnected) {
-      setConnectionStatus('online');
-      setLastError(null);
-    } else {
-      setConnectionStatus('error');
-      setLastError('Connection retry failed - Firebase services unavailable');
+    try {
+      const isConnected = await checkFirebaseConnection();
+      if (isConnected) {
+        debouncedSetStatus('online', null);
+      } else {
+        debouncedSetStatus('error', 'Connection retry failed - Firebase services unavailable');
+      }
+    } catch (error) {
+      debouncedSetStatus('error', 'Connection retry failed');
     }
   };
 
@@ -112,7 +106,7 @@ export const useConnectionStatus = () => {
     lastError,
     retryConnection,
     clearError,
-    setConnectionStatus,
+    setConnectionStatus: debouncedSetStatus,
     setLastError
   };
 };
