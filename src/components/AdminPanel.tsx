@@ -1,22 +1,24 @@
+
 import { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Users, FileText, Zap, TrendingUp, Trash2, Edit, Star, RotateCcw, Database, AlertTriangle, Activity, UserCheck, Upload } from 'lucide-react';
 import { User, AdminStats, Idea } from '@/types';
 import { PersonaProfile, ConceptDoc } from '@/types/persona';
 import { getAllUsers, getAdminStats } from '@/services/userService';
 import { getAllIdeas, deleteIdea, toggleIdeaFeatured } from '@/services/firestoreService';
-import { getAllPersonas, createPersona, deletePersona } from '@/services/personaService';
+import { getAllPersonas, deletePersona } from '@/services/personaService';
 import { getAllConceptDocs, deleteConceptDoc } from '@/services/conceptDocService';
 import { seedMockData } from '@/services/migrationService';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from '@/hooks/use-toast';
 import EditIdeaDialog from './EditIdeaDialog';
-import ActivityFeed from './ActivityFeed';
-import ConceptDocUpload from './ConceptDocUpload';
+import AdminHeader from './admin/AdminHeader';
+import AdminStats from './admin/AdminStats';
+import UserManagementTab from './admin/UserManagementTab';
+import ContentManagementTab from './admin/ContentManagementTab';
+import PersonasTab from './admin/PersonasTab';
+import ConceptDocsTab from './admin/ConceptDocsTab';
+import ActivityTab from './admin/ActivityTab';
+import AnalyticsTab from './admin/AnalyticsTab';
 
 const AdminPanel = () => {
   const { firebaseUser } = useAuth();
@@ -70,7 +72,7 @@ const AdminPanel = () => {
           title: "Data seeded successfully!",
           description: "5 high-quality pain points have been added to the database",
         });
-        await loadAdminData(); // Refresh data
+        await loadAdminData();
       }
     } catch (error) {
       toast({
@@ -174,106 +176,16 @@ const AdminPanel = () => {
     );
   }
 
-  const painPoints = ideas.filter(idea => idea.isPainPoint);
-  const regularIdeas = ideas.filter(idea => !idea.isPainPoint);
-
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-gray-900">Admin Dashboard</h2>
-        <div className="flex space-x-2">
-          {ideas.length === 0 && (
-            <Button onClick={handleSeedData} className="bg-green-600 hover:bg-green-700 text-white">
-              <Database className="w-4 h-4 mr-2" />
-              Seed Quality Data
-            </Button>
-          )}
-          <Button onClick={loadAdminData} variant="outline">
-            <RotateCcw className="w-4 h-4 mr-2" />
-            Refresh
-          </Button>
-        </div>
-      </div>
+      <AdminHeader 
+        ideas={ideas}
+        onSeedData={handleSeedData}
+        onRefresh={loadAdminData}
+      />
 
-      {/* Quick Actions */}
-      {ideas.length === 0 && (
-        <Card className="bg-gradient-to-r from-green-50 to-blue-50 border-green-200">
-          <CardContent className="p-6">
-            <div className="flex items-center space-x-3">
-              <AlertTriangle className="w-8 h-8 text-green-600" />
-              <div>
-                <h3 className="text-lg font-semibold text-green-900">Ready to populate with quality data?</h3>
-                <p className="text-green-700">Seed the database with 5 compelling pain points to start testing the platform.</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      <AdminStats stats={stats} personas={personas} />
 
-      {/* Admin Stats Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
-        <Card className="bg-gradient-to-br from-blue-500 to-blue-600 text-white border-0">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-blue-100 text-sm">Total Users</p>
-                <p className="text-3xl font-bold">{stats?.totalUsers || 0}</p>
-              </div>
-              <Users className="w-8 h-8 text-blue-200" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gradient-to-br from-green-500 to-green-600 text-white border-0">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-green-100 text-sm">Pain Points</p>
-                <p className="text-3xl font-bold">{stats?.totalPainPoints || 0}</p>
-              </div>
-              <FileText className="w-8 h-8 text-green-200" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gradient-to-br from-purple-500 to-purple-600 text-white border-0">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-purple-100 text-sm">Total Ideas</p>
-                <p className="text-3xl font-bold">{stats?.totalIdeas || 0}</p>
-              </div>
-              <TrendingUp className="w-8 h-8 text-purple-200" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gradient-to-br from-orange-500 to-orange-600 text-white border-0">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-orange-100 text-sm">Signal Points</p>
-                <p className="text-3xl font-bold">{stats?.totalSignalPoints.toLocaleString() || 0}</p>
-              </div>
-              <Zap className="w-8 h-8 text-orange-200" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gradient-to-br from-indigo-500 to-indigo-600 text-white border-0">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-indigo-100 text-sm">Personas</p>
-                <p className="text-3xl font-bold">{personas.length}</p>
-              </div>
-              <UserCheck className="w-8 h-8 text-indigo-200" />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Admin Tabs */}
       <Tabs defaultValue="users" className="space-y-6">
         <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="users">User Management</TabsTrigger>
@@ -284,344 +196,40 @@ const AdminPanel = () => {
           <TabsTrigger value="analytics">Analytics</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="users" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>All Users ({users.length})</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>User</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Signal Points</TableHead>
-                    <TableHead>Ideas Influenced</TableHead>
-                    <TableHead>Role</TableHead>
-                    <TableHead>Joined</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {users.map((user) => (
-                    <TableRow key={user.id}>
-                      <TableCell className="font-medium">{user.displayName}</TableCell>
-                      <TableCell>{user.email}</TableCell>
-                      <TableCell>{user.signalPoints.toLocaleString()}</TableCell>
-                      <TableCell>{user.ideasInfluenced}</TableCell>
-                      <TableCell>
-                        {user.isAdmin ? (
-                          <Badge className="bg-red-600">Admin</Badge>
-                        ) : (
-                          <Badge variant="secondary">User</Badge>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {user.joinedAt ? new Date(user.joinedAt).toLocaleDateString() : 'N/A'}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
+        <TabsContent value="users">
+          <UserManagementTab users={users} />
         </TabsContent>
 
-        <TabsContent value="content" className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center justify-between">
-                  Pain Points ({painPoints.length})
-                  <Badge className="bg-red-600">Live Content</Badge>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {painPoints.slice(0, 8).map((idea) => (
-                    <div key={idea.id} className="flex items-center justify-between p-3 bg-red-50 rounded-lg">
-                      <div className="flex-1">
-                        <h4 className="font-medium text-sm">{idea.headline || idea.title}</h4>
-                        <p className="text-xs text-gray-500">{idea.voteCount} votes • {idea.totalPoints} pts</p>
-                        {idea.isFeatured && <Badge className="mt-1 bg-yellow-500 text-xs">Featured</Badge>}
-                      </div>
-                      <div className="flex space-x-1">
-                        <Button 
-                          size="sm" 
-                          variant="ghost" 
-                          className="p-1 h-6"
-                          onClick={() => setEditingIdea(idea)}
-                        >
-                          <Edit className="w-3 h-3" />
-                        </Button>
-                        <Button 
-                          size="sm" 
-                          variant="ghost" 
-                          className="p-1 h-6"
-                          onClick={() => handleToggleFeatured(idea.id, idea.headline || idea.title, !!idea.isFeatured)}
-                        >
-                          <Star className={`w-3 h-3 ${idea.isFeatured ? 'text-yellow-500' : ''}`} />
-                        </Button>
-                        <Button 
-                          size="sm" 
-                          variant="ghost" 
-                          className="p-1 h-6 text-red-600"
-                          onClick={() => handleDeleteIdea(idea.id, idea.headline || idea.title)}
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                  {painPoints.length === 0 && (
-                    <div className="text-center py-4 text-gray-500">
-                      No pain points yet. Click "Seed Quality Data" to add some.
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Regular Ideas ({regularIdeas.length})</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {regularIdeas.slice(0, 8).map((idea) => (
-                    <div key={idea.id} className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
-                      <div className="flex-1">
-                        <h4 className="font-medium text-sm">{idea.title}</h4>
-                        <p className="text-xs text-gray-500">{idea.voteCount} votes • {idea.totalPoints} pts</p>
-                        {idea.isFeatured && <Badge className="mt-1 bg-yellow-500 text-xs">Featured</Badge>}
-                      </div>
-                      <div className="flex space-x-1">
-                        <Button 
-                          size="sm" 
-                          variant="ghost" 
-                          className="p-1 h-6"
-                          onClick={() => setEditingIdea(idea)}
-                        >
-                          <Edit className="w-3 h-3" />
-                        </Button>
-                        <Button 
-                          size="sm" 
-                          variant="ghost" 
-                          className="p-1 h-6"
-                          onClick={() => handleToggleFeatured(idea.id, idea.title, !!idea.isFeatured)}
-                        >
-                          <Star className={`w-3 h-3 ${idea.isFeatured ? 'text-yellow-500' : ''}`} />
-                        </Button>
-                        <Button 
-                          size="sm" 
-                          variant="ghost" 
-                          className="p-1 h-6 text-red-600"
-                          onClick={() => handleDeleteIdea(idea.id, idea.title)}
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+        <TabsContent value="content">
+          <ContentManagementTab 
+            ideas={ideas}
+            onEditIdea={setEditingIdea}
+            onToggleFeatured={handleToggleFeatured}
+            onDeleteIdea={handleDeleteIdea}
+          />
         </TabsContent>
 
-        <TabsContent value="personas" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Persona Profiles ({personas.length})</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Description</TableHead>
-                    <TableHead>Tags of Interest</TableHead>
-                    <TableHead>Review Queue</TableHead>
-                    <TableHead>Catalog</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {personas.map((persona) => (
-                    <TableRow key={persona.id}>
-                      <TableCell className="font-medium">{persona.name}</TableCell>
-                      <TableCell className="max-w-xs truncate">{persona.description}</TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap gap-1">
-                          {persona.tagsOfInterest.slice(0, 3).map(tag => (
-                            <Badge key={tag} variant="secondary" className="text-xs">
-                              {tag}
-                            </Badge>
-                          ))}
-                          {persona.tagsOfInterest.length > 3 && (
-                            <Badge variant="outline" className="text-xs">
-                              +{persona.tagsOfInterest.length - 3}
-                            </Badge>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>{persona.conceptDocReviewQueue.length}</TableCell>
-                      <TableCell>{persona.conceptDocCatalog.length}</TableCell>
-                      <TableCell>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="p-1 h-6 text-red-600"
-                          onClick={() => handleDeletePersona(persona.id, persona.name)}
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
+        <TabsContent value="personas">
+          <PersonasTab 
+            personas={personas}
+            onDeletePersona={handleDeletePersona}
+          />
         </TabsContent>
 
-        <TabsContent value="concept-docs" className="space-y-6">
-          <ConceptDocUpload onDocUploaded={loadAdminData} />
-          
-          <Card>
-            <CardHeader>
-              <CardTitle>All Concept Documents ({conceptDocs.length})</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Title</TableHead>
-                    <TableHead>Author</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Target Personas</TableHead>
-                    <TableHead>Created</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {conceptDocs.map((doc) => (
-                    <TableRow key={doc.id}>
-                      <TableCell className="font-medium max-w-xs">
-                        <div>
-                          <p className="truncate">{doc.title}</p>
-                          {doc.subtitle && (
-                            <p className="text-xs text-gray-500 truncate">{doc.subtitle}</p>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>{doc.author}</TableCell>
-                      <TableCell>
-                        <Badge 
-                          className={
-                            doc.status === 'published' ? 'bg-green-600' :
-                            doc.status === 'curated_review' ? 'bg-yellow-600' :
-                            doc.status === 'draft' ? 'bg-gray-600' :
-                            'bg-blue-600'
-                          }
-                        >
-                          {doc.status.replace('_', ' ')}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>{doc.targetPersonas.length}</TableCell>
-                      <TableCell>
-                        {new Date(doc.createdAt).toLocaleDateString()}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex space-x-1">
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="p-1 h-6"
-                            onClick={() => window.open(doc.htmlUrl, '_blank')}
-                          >
-                            <Upload className="w-3 h-3" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="p-1 h-6 text-red-600"
-                            onClick={() => handleDeleteConceptDoc(doc.id, doc.title)}
-                          >
-                            <Trash2 className="w-3 h-3" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
+        <TabsContent value="concept-docs">
+          <ConceptDocsTab 
+            conceptDocs={conceptDocs}
+            onDeleteConceptDoc={handleDeleteConceptDoc}
+            onDocUploaded={loadAdminData}
+          />
         </TabsContent>
 
-        <TabsContent value="activity" className="space-y-6">
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg font-semibold">Real-Time Platform Activity</h3>
-            <Badge className="bg-green-600">
-              <Activity className="w-3 h-3 mr-1" />
-              Live
-            </Badge>
-          </div>
-          
-          <ActivityFeed isAdminView={true} />
-
-          {stats?.recentActivity && stats.recentActivity.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Recent Admin Activity Summary</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {stats.recentActivity.slice(0, 10).map((activity) => (
-                    <div key={activity.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                      <div>
-                        <p className="font-medium text-sm">
-                          {activity.userName} {activity.action.toLowerCase()} "{activity.target}"
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          {activity.timestamp.toLocaleDateString()} at {activity.timestamp.toLocaleTimeString()}
-                        </p>
-                      </div>
-                      {activity.points && (
-                        <Badge className="bg-green-100 text-green-800">
-                          +{activity.points} pts
-                        </Badge>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
+        <TabsContent value="activity">
+          <ActivityTab stats={stats} />
         </TabsContent>
 
-        <TabsContent value="analytics" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Platform Analytics</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="text-center p-4 bg-gray-50 rounded-lg">
-                  <p className="text-2xl font-bold text-purple-600">{stats?.totalUsers || 0}</p>
-                  <p className="text-sm text-gray-600">Total Users</p>
-                </div>
-                <div className="text-center p-4 bg-gray-50 rounded-lg">
-                  <p className="text-2xl font-bold text-green-600">{stats?.totalIdeas || 0}</p>
-                  <p className="text-sm text-gray-600">Total Submissions</p>
-                </div>
-                <div className="text-center p-4 bg-gray-50 rounded-lg">
-                  <p className="text-2xl font-bold text-orange-600">{stats?.totalSignalPoints.toLocaleString() || 0}</p>
-                  <p className="text-sm text-gray-600">Signal Points Earned</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+        <TabsContent value="analytics">
+          <AnalyticsTab stats={stats} />
         </TabsContent>
       </Tabs>
 
