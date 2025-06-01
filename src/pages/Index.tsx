@@ -13,6 +13,7 @@ const Index = () => {
         <div className="text-white text-center">
           <div className="w-16 h-16 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
           <p className="text-lg">Loading Signal Vault...</p>
+          <p className="text-sm text-purple-300 mt-2">Setting up your workspace</p>
         </div>
       </div>
     );

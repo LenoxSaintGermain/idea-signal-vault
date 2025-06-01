@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from '@/hooks/use-toast';
-import { TrendingUp } from 'lucide-react';
+import { TrendingUp, Loader2 } from 'lucide-react';
 
 const AuthForm = () => {
   const [isSignUp, setIsSignUp] = useState(false);
@@ -14,27 +14,51 @@ const AuthForm = () => {
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [loading, setLoading] = useState(false);
+  const [loadingStep, setLoadingStep] = useState('');
   const { signIn, signUp } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
+    const startTime = performance.now();
+    console.log('🔐 Auth process started at:', new Date().toISOString());
+
     try {
       if (isSignUp) {
+        setLoadingStep('Creating your account...');
+        console.log('📝 Starting user registration');
+        
+        const authStart = performance.now();
         await signUp(email, password, displayName);
+        console.log(`✅ Registration completed in ${(performance.now() - authStart).toFixed(0)}ms`);
+        
         toast({
           title: "Account created!",
           description: "Welcome to Signal Vault. Start earning Signal Points!",
         });
       } else {
+        setLoadingStep('Authenticating...');
+        console.log('🔑 Starting user authentication');
+        
+        const authStart = performance.now();
         await signIn(email, password);
+        console.log(`✅ Authentication completed in ${(performance.now() - authStart).toFixed(0)}ms`);
+        
         toast({
           title: "Welcome back!",
           description: "Ready to explore new ideas?",
         });
       }
+      
+      const totalTime = performance.now() - startTime;
+      console.log(`🎉 Total auth process completed in ${totalTime.toFixed(0)}ms`);
+      
     } catch (error: any) {
+      console.error('❌ Auth error:', error);
+      const errorTime = performance.now() - startTime;
+      console.log(`💥 Auth failed after ${errorTime.toFixed(0)}ms`);
+      
       toast({
         title: "Authentication failed",
         description: error.message,
@@ -42,6 +66,7 @@ const AuthForm = () => {
       });
     } finally {
       setLoading(false);
+      setLoadingStep('');
     }
   };
 
@@ -78,6 +103,7 @@ const AuthForm = () => {
                     onChange={(e) => setDisplayName(e.target.value)}
                     required={isSignUp}
                     placeholder="Your name"
+                    disabled={loading}
                   />
                 </div>
               )}
@@ -91,6 +117,7 @@ const AuthForm = () => {
                   onChange={(e) => setEmail(e.target.value)}
                   required
                   placeholder="your@email.com"
+                  disabled={loading}
                 />
               </div>
               
@@ -103,6 +130,7 @@ const AuthForm = () => {
                   onChange={(e) => setPassword(e.target.value)}
                   required
                   placeholder="••••••••"
+                  disabled={loading}
                 />
               </div>
               
@@ -111,19 +139,28 @@ const AuthForm = () => {
                 className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
                 disabled={loading}
               >
-                {loading ? 'Please wait...' : (isSignUp ? 'Create Account' : 'Sign In')}
+                {loading ? (
+                  <div className="flex items-center space-x-2">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>{loadingStep || 'Please wait...'}</span>
+                  </div>
+                ) : (
+                  isSignUp ? 'Create Account' : 'Sign In'
+                )}
               </Button>
             </form>
             
-            <div className="mt-4 text-center">
-              <button
-                type="button"
-                onClick={() => setIsSignUp(!isSignUp)}
-                className="text-sm text-purple-600 hover:text-purple-700 underline"
-              >
-                {isSignUp ? 'Already have an account? Sign in' : "Don't have an account? Sign up"}
-              </button>
-            </div>
+            {!loading && (
+              <div className="mt-4 text-center">
+                <button
+                  type="button"
+                  onClick={() => setIsSignUp(!isSignUp)}
+                  className="text-sm text-purple-600 hover:text-purple-700 underline"
+                >
+                  {isSignUp ? 'Already have an account? Sign in' : "Don't have an account? Sign up"}
+                </button>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
