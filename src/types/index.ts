@@ -1,4 +1,3 @@
-
 export interface Idea {
   id: string;
   title: string;
@@ -18,6 +17,8 @@ export interface Idea {
   solution?: string;
   isPainPoint?: boolean;
   cta?: string;
+  // Persona routing
+  targetPersonas?: string[];
 }
 
 export interface User {
@@ -66,3 +67,6 @@ export interface AdminActivity {
   timestamp: Date;
   points?: number;
 }
+
+// Re-export persona types
+export type { PersonaProfile, ConceptDoc, PersonaReview } from './persona';

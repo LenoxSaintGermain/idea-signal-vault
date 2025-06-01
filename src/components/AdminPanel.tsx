@@ -4,21 +4,27 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Users, FileText, Zap, TrendingUp, Trash2, Edit, Star, RotateCcw, Database, AlertTriangle, Activity } from 'lucide-react';
+import { Users, FileText, Zap, TrendingUp, Trash2, Edit, Star, RotateCcw, Database, AlertTriangle, Activity, UserCheck, Upload } from 'lucide-react';
 import { User, AdminStats, Idea } from '@/types';
+import { PersonaProfile, ConceptDoc } from '@/types/persona';
 import { getAllUsers, getAdminStats } from '@/services/userService';
 import { getAllIdeas, deleteIdea, toggleIdeaFeatured } from '@/services/firestoreService';
+import { getAllPersonas, createPersona, deletePersona } from '@/services/personaService';
+import { getAllConceptDocs, deleteConceptDoc } from '@/services/conceptDocService';
 import { seedMockData } from '@/services/migrationService';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from '@/hooks/use-toast';
 import EditIdeaDialog from './EditIdeaDialog';
 import ActivityFeed from './ActivityFeed';
+import ConceptDocUpload from './ConceptDocUpload';
 
 const AdminPanel = () => {
   const { firebaseUser } = useAuth();
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [users, setUsers] = useState<User[]>([]);
   const [ideas, setIdeas] = useState<Idea[]>([]);
+  const [personas, setPersonas] = useState<PersonaProfile[]>([]);
+  const [conceptDocs, setConceptDocs] = useState<ConceptDoc[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingIdea, setEditingIdea] = useState<Idea | null>(null);
 
@@ -28,15 +34,19 @@ const AdminPanel = () => {
 
   const loadAdminData = async () => {
     try {
-      const [adminStats, allUsers, allIdeas] = await Promise.all([
+      const [adminStats, allUsers, allIdeas, allPersonas, allConceptDocs] = await Promise.all([
         getAdminStats(),
         getAllUsers(),
-        getAllIdeas()
+        getAllIdeas(),
+        getAllPersonas(),
+        getAllConceptDocs()
       ]);
       
       setStats(adminStats);
       setUsers(allUsers);
       setIdeas(allIdeas);
+      setPersonas(allPersonas);
+      setConceptDocs(allConceptDocs);
     } catch (error) {
       console.error('Error loading admin data:', error);
       toast({
@@ -111,6 +121,48 @@ const AdminPanel = () => {
     }
   };
 
+  const handleDeletePersona = async (personaId: string, name: string) => {
+    if (!confirm(`Are you sure you want to delete persona "${name}"? This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      await deletePersona(personaId);
+      toast({
+        title: "Persona deleted",
+        description: "The persona has been removed from the database",
+      });
+      await loadAdminData();
+    } catch (error) {
+      toast({
+        title: "Delete failed",
+        description: "Could not delete the persona",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleDeleteConceptDoc = async (docId: string, title: string) => {
+    if (!confirm(`Are you sure you want to delete "${title}"? This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      await deleteConceptDoc(docId);
+      toast({
+        title: "Concept doc deleted",
+        description: "The document has been removed from the database",
+      });
+      await loadAdminData();
+    } catch (error) {
+      toast({
+        title: "Delete failed",
+        description: "Could not delete the concept document",
+        variant: "destructive"
+      });
+    }
+  };
+
   if (loading) {
     return (
       <div className="space-y-6">
@@ -159,7 +211,7 @@ const AdminPanel = () => {
       )}
 
       {/* Admin Stats Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
         <Card className="bg-gradient-to-br from-blue-500 to-blue-600 text-white border-0">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
@@ -207,13 +259,27 @@ const AdminPanel = () => {
             </div>
           </CardContent>
         </Card>
+
+        <Card className="bg-gradient-to-br from-indigo-500 to-indigo-600 text-white border-0">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-indigo-100 text-sm">Personas</p>
+                <p className="text-3xl font-bold">{personas.length}</p>
+              </div>
+              <UserCheck className="w-8 h-8 text-indigo-200" />
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Admin Tabs */}
       <Tabs defaultValue="users" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="users">User Management</TabsTrigger>
           <TabsTrigger value="content">Content Management</TabsTrigger>
+          <TabsTrigger value="personas">Personas</TabsTrigger>
+          <TabsTrigger value="concept-docs">Concept Docs</TabsTrigger>
           <TabsTrigger value="activity">Live Activity</TabsTrigger>
           <TabsTrigger value="analytics">Analytics</TabsTrigger>
         </TabsList>
@@ -360,6 +426,137 @@ const AdminPanel = () => {
               </CardContent>
             </Card>
           </div>
+        </TabsContent>
+
+        <TabsContent value="personas" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Persona Profiles ({personas.length})</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Description</TableHead>
+                    <TableHead>Tags of Interest</TableHead>
+                    <TableHead>Review Queue</TableHead>
+                    <TableHead>Catalog</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {personas.map((persona) => (
+                    <TableRow key={persona.id}>
+                      <TableCell className="font-medium">{persona.name}</TableCell>
+                      <TableCell className="max-w-xs truncate">{persona.description}</TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap gap-1">
+                          {persona.tagsOfInterest.slice(0, 3).map(tag => (
+                            <Badge key={tag} variant="secondary" className="text-xs">
+                              {tag}
+                            </Badge>
+                          ))}
+                          {persona.tagsOfInterest.length > 3 && (
+                            <Badge variant="outline" className="text-xs">
+                              +{persona.tagsOfInterest.length - 3}
+                            </Badge>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>{persona.conceptDocReviewQueue.length}</TableCell>
+                      <TableCell>{persona.conceptDocCatalog.length}</TableCell>
+                      <TableCell>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="p-1 h-6 text-red-600"
+                          onClick={() => handleDeletePersona(persona.id, persona.name)}
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="concept-docs" className="space-y-6">
+          <ConceptDocUpload onDocUploaded={loadAdminData} />
+          
+          <Card>
+            <CardHeader>
+              <CardTitle>All Concept Documents ({conceptDocs.length})</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Title</TableHead>
+                    <TableHead>Author</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Target Personas</TableHead>
+                    <TableHead>Created</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {conceptDocs.map((doc) => (
+                    <TableRow key={doc.id}>
+                      <TableCell className="font-medium max-w-xs">
+                        <div>
+                          <p className="truncate">{doc.title}</p>
+                          {doc.subtitle && (
+                            <p className="text-xs text-gray-500 truncate">{doc.subtitle}</p>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>{doc.author}</TableCell>
+                      <TableCell>
+                        <Badge 
+                          className={
+                            doc.status === 'published' ? 'bg-green-600' :
+                            doc.status === 'curated_review' ? 'bg-yellow-600' :
+                            doc.status === 'draft' ? 'bg-gray-600' :
+                            'bg-blue-600'
+                          }
+                        >
+                          {doc.status.replace('_', ' ')}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>{doc.targetPersonas.length}</TableCell>
+                      <TableCell>
+                        {new Date(doc.createdAt).toLocaleDateString()}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex space-x-1">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="p-1 h-6"
+                            onClick={() => window.open(doc.htmlUrl, '_blank')}
+                          >
+                            <Upload className="w-3 h-3" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="p-1 h-6 text-red-600"
+                            onClick={() => handleDeleteConceptDoc(doc.id, doc.title)}
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="activity" className="space-y-6">
