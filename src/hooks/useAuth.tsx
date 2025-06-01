@@ -1,9 +1,13 @@
 
 import { createContext, useContext, useEffect, useState } from 'react';
-import { User as FirebaseUser, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updateProfile } from 'firebase/auth';
-import { auth, checkFirebaseConnection, categorizeFirebaseError } from '@/lib/firebase';
+import { User as FirebaseUser, onAuthStateChanged } from 'firebase/auth';
+import { auth } from '@/lib/firebase';
 import { User } from '@/types';
-import { createUserProfile, getUserProfile, subscribeToUserProfile } from '@/services/userService';
+import { getUserProfile, createUserProfile, subscribeToUserProfile } from '@/services/userService';
+import { useConnectionStatus } from './useConnectionStatus';
+import { useAuthOperations } from './useAuthOperations';
+import { getCachedUser, setCachedUser, loadCachedUserData } from '@/utils/authCache';
+import { retryWithBackoff } from '@/utils/authRetry';
 
 interface AuthContextType {
   user: User | null;
@@ -20,126 +24,30 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Enhanced cache with offline support
-const userProfileCache = new Map<string, User>();
-const CACHE_KEY = 'signal_vault_user_cache';
-
-// Utility functions for offline support
-const saveToLocalStorage = (key: string, data: any) => {
-  try {
-    localStorage.setItem(key, JSON.stringify(data));
-  } catch (error) {
-    console.warn('💾 Failed to save to localStorage:', error);
-  }
-};
-
-const loadFromLocalStorage = (key: string) => {
-  try {
-    const data = localStorage.getItem(key);
-    return data ? JSON.parse(data) : null;
-  } catch (error) {
-    console.warn('💾 Failed to load from localStorage:', error);
-    return null;
-  }
-};
-
-// Enhanced retry logic with exponential backoff and error categorization
-const retryWithBackoff = async (fn: () => Promise<any>, maxRetries = 3) => {
-  for (let i = 0; i < maxRetries; i++) {
-    try {
-      return await fn();
-    } catch (error) {
-      const errorType = categorizeFirebaseError(error);
-      console.log(`🔄 Retry attempt ${i + 1}/${maxRetries} failed (${errorType}):`, error);
-      
-      // Don't retry auth errors
-      if (errorType === 'auth' || errorType === 'permission') {
-        throw error;
-      }
-      
-      if (i === maxRetries - 1) throw error;
-      
-      // Exponential backoff: 1s, 2s, 4s
-      const delay = Math.pow(2, i) * 1000;
-      await new Promise(resolve => setTimeout(resolve, delay));
-    }
-  }
-};
-
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
   const [loading, setLoading] = useState(true);
-  const [connectionStatus, setConnectionStatus] = useState<'online' | 'offline' | 'connecting' | 'error'>('connecting');
-  const [lastError, setLastError] = useState<string | null>(null);
-
-  // Network connectivity detection with enhanced error handling
-  useEffect(() => {
-    const handleOnline = async () => {
-      console.log('🌐 Network back online');
-      setConnectionStatus('connecting');
-      
-      // Test Firebase connection
-      const isConnected = await checkFirebaseConnection();
-      if (isConnected) {
-        setConnectionStatus('online');
-        setLastError(null);
-      } else {
-        setConnectionStatus('error');
-        setLastError('Unable to connect to Firebase services');
-      }
-    };
-    
-    const handleOffline = () => {
-      console.log('🌐 Network went offline');
-      setConnectionStatus('offline');
-      setLastError('No internet connection');
-    };
-
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-
-    // Initial network check
-    if (!navigator.onLine) {
-      setConnectionStatus('offline');
-      setLastError('No internet connection');
-    } else {
-      handleOnline();
-    }
-
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-    };
-  }, []);
+  
+  const { 
+    connectionStatus, 
+    lastError, 
+    retryConnection, 
+    clearError,
+    setConnectionStatus,
+    setLastError
+  } = useConnectionStatus();
+  
+  const { signIn, signUp, logout } = useAuthOperations(setConnectionStatus, setLastError);
 
   // Load cached user data immediately
   useEffect(() => {
-    const cachedUser = loadFromLocalStorage(CACHE_KEY);
+    const cachedUser = loadCachedUserData();
     if (cachedUser) {
       console.log('⚡ Loading cached user data');
       setUser(cachedUser);
-      userProfileCache.set(cachedUser.id, cachedUser);
     }
   }, []);
-
-  const clearError = () => {
-    setLastError(null);
-  };
-
-  const retryConnection = async () => {
-    console.log('🔄 Manual connection retry triggered');
-    setConnectionStatus('connecting');
-    setLastError(null);
-    
-    const isConnected = await checkFirebaseConnection();
-    if (isConnected) {
-      setConnectionStatus('online');
-    } else {
-      setConnectionStatus('error');
-      setLastError('Connection retry failed');
-    }
-  };
 
   useEffect(() => {
     console.log('🔄 Setting up Firebase auth state listener');
@@ -156,7 +64,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           console.log('📊 Loading user profile for:', firebaseUser.uid);
           
           // Check cache first
-          let userProfile = userProfileCache.get(firebaseUser.uid);
+          let userProfile = getCachedUser(firebaseUser.uid);
           
           if (!userProfile) {
             console.log('💾 User profile not in cache, fetching from Firestore');
@@ -177,9 +85,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
               return profile;
             });
             
-            // Cache the profile both in memory and localStorage
-            userProfileCache.set(firebaseUser.uid, userProfile);
-            saveToLocalStorage(CACHE_KEY, userProfile);
+            // Cache the profile
+            setCachedUser(firebaseUser.uid, userProfile);
           } else {
             console.log('⚡ Using cached user profile');
           }
@@ -196,8 +103,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
               const unsubscribeProfile = subscribeToUserProfile(firebaseUser.uid, (updatedUser) => {
                 if (updatedUser) {
                   console.log('🔄 Real-time profile update received');
-                  userProfileCache.set(firebaseUser.uid, updatedUser);
-                  saveToLocalStorage(CACHE_KEY, updatedUser);
+                  setCachedUser(firebaseUser.uid, updatedUser);
                   setUser(updatedUser);
                   setConnectionStatus('online');
                   setLastError(null);
@@ -210,19 +116,17 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
               };
             } catch (error) {
               console.warn('🔔 Failed to set up real-time subscription:', error);
-              const errorType = categorizeFirebaseError(error);
-              setLastError(`Real-time updates unavailable (${errorType})`);
+              setLastError(`Real-time updates unavailable`);
             }
           }, 100);
           
         } catch (error) {
           console.error('❌ Error loading user profile:', error);
-          const errorType = categorizeFirebaseError(error);
           setConnectionStatus('error');
-          setLastError(`Profile loading failed: ${errorType}`);
+          setLastError(`Profile loading failed`);
           
           // Try to use cached data as fallback
-          const cachedUser = loadFromLocalStorage(CACHE_KEY);
+          const cachedUser = loadCachedUserData();
           if (cachedUser && cachedUser.id === firebaseUser.uid) {
             console.log('💾 Using cached user data as fallback');
             setUser(cachedUser);
@@ -234,8 +138,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         setUser(null);
         setConnectionStatus('offline');
         setLastError(null);
-        userProfileCache.clear();
-        localStorage.removeItem(CACHE_KEY);
       }
       
       setLoading(false);
@@ -247,83 +149,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       console.log('🛑 Cleaning up auth listener');
       unsubscribe();
     };
-  }, []);
-
-  const signIn = async (email: string, password: string) => {
-    console.log('🔑 Starting sign in process');
-    const signInStart = performance.now();
-    
-    try {
-      setConnectionStatus('connecting');
-      setLastError(null);
-      await retryWithBackoff(async () => {
-        await signInWithEmailAndPassword(auth, email, password);
-      });
-      console.log(`✅ Sign in completed in ${(performance.now() - signInStart).toFixed(0)}ms`);
-      setConnectionStatus('online');
-    } catch (error) {
-      console.error('❌ Sign in failed:', error);
-      const errorType = categorizeFirebaseError(error);
-      setConnectionStatus('error');
-      setLastError(`Sign in failed: ${errorType}`);
-      throw error;
-    }
-  };
-
-  const signUp = async (email: string, password: string, displayName: string) => {
-    console.log('📝 Starting sign up process');
-    const signUpStart = performance.now();
-    
-    try {
-      setConnectionStatus('connecting');
-      setLastError(null);
-      const userCredential = await retryWithBackoff(async () => {
-        return await createUserWithEmailAndPassword(auth, email, password);
-      });
-      
-      await updateProfile(userCredential.user, { displayName });
-      
-      // Create user profile in Firestore
-      const profileStart = performance.now();
-      const userProfile = await retryWithBackoff(async () => {
-        return await createUserProfile(userCredential.user.uid, email, displayName);
-      });
-      
-      console.log(`📊 Profile creation completed in ${(performance.now() - profileStart).toFixed(0)}ms`);
-      
-      // Cache the new profile
-      userProfileCache.set(userCredential.user.uid, userProfile);
-      saveToLocalStorage(CACHE_KEY, userProfile);
-      
-      console.log(`✅ Sign up completed in ${(performance.now() - signUpStart).toFixed(0)}ms`);
-      setConnectionStatus('online');
-    } catch (error) {
-      console.error('❌ Sign up failed:', error);
-      const errorType = categorizeFirebaseError(error);
-      setConnectionStatus('error');
-      setLastError(`Sign up failed: ${errorType}`);
-      throw error;
-    }
-  };
-
-  const logout = async () => {
-    console.log('🚪 Starting logout process');
-    const logoutStart = performance.now();
-    
-    try {
-      await signOut(auth);
-      userProfileCache.clear();
-      localStorage.removeItem(CACHE_KEY);
-      setConnectionStatus('offline');
-      setLastError(null);
-      console.log(`✅ Logout completed in ${(performance.now() - logoutStart).toFixed(0)}ms`);
-    } catch (error) {
-      console.error('❌ Logout failed:', error);
-      const errorType = categorizeFirebaseError(error);
-      setLastError(`Logout failed: ${errorType}`);
-      throw error;
-    }
-  };
+  }, [setConnectionStatus, setLastError]);
 
   return (
     <AuthContext.Provider value={{ 
