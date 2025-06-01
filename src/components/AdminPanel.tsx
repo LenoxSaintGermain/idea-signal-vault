@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { User, AdminStats as AdminStatsType, Idea } from '@/types';
@@ -7,7 +6,7 @@ import { getAllUsers, getAdminStats } from '@/services/userService';
 import { getAllIdeas, deleteIdea, toggleIdeaFeatured } from '@/services/firestoreService';
 import { getAllPersonas, deletePersona } from '@/services/personaService';
 import { getAllConceptDocs, deleteConceptDoc } from '@/services/conceptDocService';
-import { seedMockData } from '@/services/migrationService';
+import { enhancedMigrationService } from '@/services/enhancedMigrationService';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from '@/hooks/use-toast';
 import EditIdeaDialog from './EditIdeaDialog';
@@ -19,6 +18,7 @@ import PersonasTab from './admin/PersonasTab';
 import ConceptDocsTab from './admin/ConceptDocsTab';
 import ActivityTab from './admin/ActivityTab';
 import AnalyticsTab from './admin/AnalyticsTab';
+import FirebaseDebugPanel from './admin/FirebaseDebugPanel';
 
 const AdminPanel = () => {
   const { firebaseUser } = useAuth();
@@ -66,18 +66,64 @@ const AdminPanel = () => {
     
     try {
       setLoading(true);
-      const success = await seedMockData(firebaseUser.uid);
-      if (success) {
+      
+      // Test connectivity first
+      const isConnected = await enhancedMigrationService.testDatabaseConnectivity();
+      if (!isConnected) {
+        toast({
+          title: "Connection issue detected",
+          description: "Running recovery sequence...",
+        });
+      }
+      
+      const result = await enhancedMigrationService.seedMockIdeas(firebaseUser.uid, true);
+      
+      if (result.success) {
         toast({
           title: "Data seeded successfully!",
-          description: "5 high-quality pain points have been added to the database",
+          description: `${result.successCount} ideas added to the database`,
         });
         await loadAdminData();
+      } else {
+        toast({
+          title: "Seeding partially failed",
+          description: `${result.failCount} ideas failed to seed`,
+          variant: "destructive"
+        });
       }
     } catch (error) {
       toast({
         title: "Seeding failed",
         description: "Could not seed the mock data",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSeedPersonas = async () => {
+    try {
+      setLoading(true);
+      const result = await enhancedMigrationService.seedSamplePersonas(true);
+      
+      if (result.success) {
+        toast({
+          title: "Personas seeded successfully!",
+          description: `${result.successCount} personas added to the database`,
+        });
+        await loadAdminData();
+      } else {
+        toast({
+          title: "Persona seeding failed",
+          description: "Could not seed sample personas",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Seeding failed",
+        description: "Could not seed personas",
         variant: "destructive"
       });
     } finally {
@@ -186,15 +232,30 @@ const AdminPanel = () => {
 
       <AdminStatsComponent stats={stats} personas={personas} />
 
-      <Tabs defaultValue="users" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-6">
-          <TabsTrigger value="users">User Management</TabsTrigger>
-          <TabsTrigger value="content">Content Management</TabsTrigger>
+      <Tabs defaultValue="debug" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-7">
+          <TabsTrigger value="debug">Debug</TabsTrigger>
+          <TabsTrigger value="users">Users</TabsTrigger>
+          <TabsTrigger value="content">Content</TabsTrigger>
           <TabsTrigger value="personas">Personas</TabsTrigger>
-          <TabsTrigger value="concept-docs">Concept Docs</TabsTrigger>
-          <TabsTrigger value="activity">Live Activity</TabsTrigger>
+          <TabsTrigger value="concept-docs">Docs</TabsTrigger>
+          <TabsTrigger value="activity">Activity</TabsTrigger>
           <TabsTrigger value="analytics">Analytics</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="debug" className="space-y-6">
+          <FirebaseDebugPanel />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <button
+              onClick={handleSeedPersonas}
+              className="p-4 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg text-left transition-colors"
+              disabled={loading}
+            >
+              <h3 className="font-semibold text-blue-900">Seed Sample Personas</h3>
+              <p className="text-sm text-blue-700 mt-1">Add sample personas to the database</p>
+            </button>
+          </div>
+        </TabsContent>
 
         <TabsContent value="users">
           <UserManagementTab users={users} />
