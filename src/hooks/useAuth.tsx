@@ -1,7 +1,7 @@
 
 import { createContext, useContext, useEffect, useState } from 'react';
 import { User as FirebaseUser, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updateProfile } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
+import { auth, checkFirebaseConnection, categorizeFirebaseError } from '@/lib/firebase';
 import { User } from '@/types';
 import { createUserProfile, getUserProfile, subscribeToUserProfile } from '@/services/userService';
 
@@ -10,10 +10,12 @@ interface AuthContextType {
   firebaseUser: FirebaseUser | null;
   loading: boolean;
   connectionStatus: 'online' | 'offline' | 'connecting' | 'error';
+  lastError: string | null;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, displayName: string) => Promise<void>;
   logout: () => Promise<void>;
   retryConnection: () => void;
+  clearError: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -41,13 +43,20 @@ const loadFromLocalStorage = (key: string) => {
   }
 };
 
-// Retry logic with exponential backoff
+// Enhanced retry logic with exponential backoff and error categorization
 const retryWithBackoff = async (fn: () => Promise<any>, maxRetries = 3) => {
   for (let i = 0; i < maxRetries; i++) {
     try {
       return await fn();
     } catch (error) {
-      console.log(`🔄 Retry attempt ${i + 1}/${maxRetries} failed:`, error);
+      const errorType = categorizeFirebaseError(error);
+      console.log(`🔄 Retry attempt ${i + 1}/${maxRetries} failed (${errorType}):`, error);
+      
+      // Don't retry auth errors
+      if (errorType === 'auth' || errorType === 'permission') {
+        throw error;
+      }
+      
       if (i === maxRetries - 1) throw error;
       
       // Exponential backoff: 1s, 2s, 4s
@@ -62,17 +71,29 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [connectionStatus, setConnectionStatus] = useState<'online' | 'offline' | 'connecting' | 'error'>('connecting');
+  const [lastError, setLastError] = useState<string | null>(null);
 
-  // Network connectivity detection
+  // Network connectivity detection with enhanced error handling
   useEffect(() => {
-    const handleOnline = () => {
+    const handleOnline = async () => {
       console.log('🌐 Network back online');
       setConnectionStatus('connecting');
+      
+      // Test Firebase connection
+      const isConnected = await checkFirebaseConnection();
+      if (isConnected) {
+        setConnectionStatus('online');
+        setLastError(null);
+      } else {
+        setConnectionStatus('error');
+        setLastError('Unable to connect to Firebase services');
+      }
     };
     
     const handleOffline = () => {
       console.log('🌐 Network went offline');
       setConnectionStatus('offline');
+      setLastError('No internet connection');
     };
 
     window.addEventListener('online', handleOnline);
@@ -81,6 +102,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     // Initial network check
     if (!navigator.onLine) {
       setConnectionStatus('offline');
+      setLastError('No internet connection');
+    } else {
+      handleOnline();
     }
 
     return () => {
@@ -99,10 +123,22 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   }, []);
 
-  const retryConnection = () => {
+  const clearError = () => {
+    setLastError(null);
+  };
+
+  const retryConnection = async () => {
     console.log('🔄 Manual connection retry triggered');
     setConnectionStatus('connecting');
-    // The auth state listener will handle the actual reconnection
+    setLastError(null);
+    
+    const isConnected = await checkFirebaseConnection();
+    if (isConnected) {
+      setConnectionStatus('online');
+    } else {
+      setConnectionStatus('error');
+      setLastError('Connection retry failed');
+    }
   };
 
   useEffect(() => {
@@ -150,6 +186,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           
           setUser(userProfile);
           setConnectionStatus('online');
+          setLastError(null);
           console.log(`📊 Profile loaded in ${(performance.now() - profileStart).toFixed(0)}ms`);
           
           // Set up real-time subscription after initial load (with error handling)
@@ -163,6 +200,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                   saveToLocalStorage(CACHE_KEY, updatedUser);
                   setUser(updatedUser);
                   setConnectionStatus('online');
+                  setLastError(null);
                 }
               });
               
@@ -172,13 +210,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
               };
             } catch (error) {
               console.warn('🔔 Failed to set up real-time subscription:', error);
-              // Don't fail the auth process if subscription fails
+              const errorType = categorizeFirebaseError(error);
+              setLastError(`Real-time updates unavailable (${errorType})`);
             }
           }, 100);
           
         } catch (error) {
           console.error('❌ Error loading user profile:', error);
+          const errorType = categorizeFirebaseError(error);
           setConnectionStatus('error');
+          setLastError(`Profile loading failed: ${errorType}`);
           
           // Try to use cached data as fallback
           const cachedUser = loadFromLocalStorage(CACHE_KEY);
@@ -192,6 +233,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       } else {
         setUser(null);
         setConnectionStatus('offline');
+        setLastError(null);
         userProfileCache.clear();
         localStorage.removeItem(CACHE_KEY);
       }
@@ -213,6 +255,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     
     try {
       setConnectionStatus('connecting');
+      setLastError(null);
       await retryWithBackoff(async () => {
         await signInWithEmailAndPassword(auth, email, password);
       });
@@ -220,7 +263,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setConnectionStatus('online');
     } catch (error) {
       console.error('❌ Sign in failed:', error);
+      const errorType = categorizeFirebaseError(error);
       setConnectionStatus('error');
+      setLastError(`Sign in failed: ${errorType}`);
       throw error;
     }
   };
@@ -231,6 +276,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     
     try {
       setConnectionStatus('connecting');
+      setLastError(null);
       const userCredential = await retryWithBackoff(async () => {
         return await createUserWithEmailAndPassword(auth, email, password);
       });
@@ -253,7 +299,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setConnectionStatus('online');
     } catch (error) {
       console.error('❌ Sign up failed:', error);
+      const errorType = categorizeFirebaseError(error);
       setConnectionStatus('error');
+      setLastError(`Sign up failed: ${errorType}`);
       throw error;
     }
   };
@@ -267,9 +315,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       userProfileCache.clear();
       localStorage.removeItem(CACHE_KEY);
       setConnectionStatus('offline');
+      setLastError(null);
       console.log(`✅ Logout completed in ${(performance.now() - logoutStart).toFixed(0)}ms`);
     } catch (error) {
       console.error('❌ Logout failed:', error);
+      const errorType = categorizeFirebaseError(error);
+      setLastError(`Logout failed: ${errorType}`);
       throw error;
     }
   };
@@ -280,10 +331,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       firebaseUser, 
       loading, 
       connectionStatus, 
+      lastError,
       signIn, 
       signUp, 
       logout, 
-      retryConnection 
+      retryConnection,
+      clearError
     }}>
       {children}
     </AuthContext.Provider>

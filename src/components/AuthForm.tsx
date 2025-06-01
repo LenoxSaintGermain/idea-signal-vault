@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from '@/hooks/use-toast';
-import { TrendingUp, Loader2, WifiOff, AlertCircle, RefreshCw } from 'lucide-react';
+import { TrendingUp, Loader2, WifiOff, AlertCircle, RefreshCw, X } from 'lucide-react';
 
 const AuthForm = () => {
   const [isSignUp, setIsSignUp] = useState(false);
@@ -15,7 +15,7 @@ const AuthForm = () => {
   const [displayName, setDisplayName] = useState('');
   const [loading, setLoading] = useState(false);
   const [loadingStep, setLoadingStep] = useState('');
-  const { signIn, signUp, connectionStatus, retryConnection } = useAuth();
+  const { signIn, signUp, connectionStatus, lastError, retryConnection, clearError } = useAuth();
 
   const getConnectionStatusInfo = () => {
     switch (connectionStatus) {
@@ -92,6 +92,12 @@ const AuthForm = () => {
         errorMessage = 'Too many failed attempts. Please try again later.';
       } else if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
         errorMessage = 'Invalid email or password.';
+      } else if (error.code === 'auth/email-already-in-use') {
+        errorMessage = 'An account with this email already exists.';
+      } else if (error.code === 'auth/weak-password') {
+        errorMessage = 'Password should be at least 6 characters.';
+      } else if (error.code === 'auth/invalid-email') {
+        errorMessage = 'Please enter a valid email address.';
       }
       
       toast({
@@ -135,6 +141,26 @@ const AuthForm = () => {
               </Button>
             )}
           </div>
+
+          {/* Enhanced Error Display */}
+          {lastError && (
+            <div className="mt-3 bg-red-900/20 border border-red-500/30 rounded-lg p-3 text-red-300 text-sm">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <AlertCircle className="w-4 h-4" />
+                  <span>{lastError}</span>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={clearError}
+                  className="text-red-300 hover:text-white p-1 h-auto"
+                >
+                  <X className="w-3 h-3" />
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
 
         <Card className="border-0 shadow-2xl bg-white/95 backdrop-blur">
