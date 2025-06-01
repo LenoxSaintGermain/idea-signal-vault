@@ -1,7 +1,6 @@
-
 import { createContext, useContext, useEffect, useState } from 'react';
 import { User as FirebaseUser, onAuthStateChanged } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
+import { auth, getFirebaseConnectionState } from '@/lib/firebase';
 import { User } from '@/types';
 import { getUserProfile, createUserProfile, subscribeToUserProfile } from '@/services/userService';
 import { useConnectionStatus } from './useConnectionStatus';
@@ -40,14 +39,90 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   
   const { signIn, signUp, logout } = useAuthOperations(setConnectionStatus, setLastError);
 
-  // Load cached user data immediately
+  // Load cached user data immediately for faster initial load
   useEffect(() => {
     const cachedUser = loadCachedUserData();
     if (cachedUser) {
-      console.log('⚡ Loading cached user data');
+      console.log('⚡ Loading cached user data for fast startup');
       setUser(cachedUser);
     }
   }, []);
+
+  // Enhanced profile loading with better fallback mechanisms
+  const loadUserProfile = async (firebaseUser: FirebaseUser, allowCache = true): Promise<User | null> => {
+    const profileStart = performance.now();
+    console.log('📊 Loading user profile for:', firebaseUser.uid);
+    
+    // Check cache first if allowed
+    if (allowCache) {
+      const cachedProfile = getCachedUser(firebaseUser.uid);
+      if (cachedProfile) {
+        console.log('⚡ Using cached user profile');
+        return cachedProfile;
+      }
+    }
+    
+    console.log('💾 User profile not in cache, fetching from Firestore');
+    
+    // Check Firebase connection state
+    const firebaseState = getFirebaseConnectionState();
+    console.log('🔥 Firebase state during profile load:', firebaseState);
+    
+    try {
+      // Try to fetch with enhanced retry logic
+      const userProfile = await retryWithBackoff(async () => {
+        const profile = await getUserProfile(firebaseUser.uid);
+        
+        if (!profile) {
+          console.log('👤 Creating new user profile');
+          return await createUserProfile(
+            firebaseUser.uid,
+            firebaseUser.email || '',
+            firebaseUser.displayName || 'Anonymous'
+          );
+        }
+        
+        return profile;
+      }, 2); // Reduced retries for faster fallback
+      
+      // Cache the profile
+      setCachedUser(firebaseUser.uid, userProfile);
+      console.log(`📊 Profile loaded in ${(performance.now() - profileStart).toFixed(0)}ms`);
+      return userProfile;
+      
+    } catch (error) {
+      console.error('❌ Error loading user profile:', error);
+      
+      // Enhanced fallback: try cached data even if it wasn't initially found
+      const fallbackCachedUser = loadCachedUserData();
+      if (fallbackCachedUser && fallbackCachedUser.id === firebaseUser.uid) {
+        console.log('💾 Using cached user data as fallback after error');
+        return fallbackCachedUser;
+      }
+      
+      // If offline, create minimal profile from Firebase user data
+      if (!navigator.onLine || !firebaseState.isOnline) {
+        console.log('🔌 Creating offline fallback profile');
+        const offlineProfile: User = {
+          id: firebaseUser.uid,
+          email: firebaseUser.email || '',
+          displayName: firebaseUser.displayName || 'Anonymous',
+          signalPoints: 0,
+          ideasInfluenced: 0,
+          estimatedTake: 0,
+          isAdmin: false,
+          joinedAt: new Date(),
+          lastActive: new Date()
+        };
+        
+        // Cache the offline profile
+        setCachedUser(firebaseUser.uid, offlineProfile);
+        return offlineProfile;
+      }
+      
+      throw error;
+    }
+  };
 
   useEffect(() => {
     console.log('🔄 Setting up Firebase auth state listener');
@@ -60,76 +135,51 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       if (firebaseUser) {
         try {
           setConnectionStatus('connecting');
-          const profileStart = performance.now();
-          console.log('📊 Loading user profile for:', firebaseUser.uid);
           
-          // Check cache first
-          let userProfile = getCachedUser(firebaseUser.uid);
+          const userProfile = await loadUserProfile(firebaseUser);
           
-          if (!userProfile) {
-            console.log('💾 User profile not in cache, fetching from Firestore');
+          if (userProfile) {
+            setUser(userProfile);
+            setConnectionStatus('online');
+            setLastError(null);
             
-            // Try to fetch with retry logic
-            userProfile = await retryWithBackoff(async () => {
-              const profile = await getUserProfile(firebaseUser.uid);
-              
-              if (!profile) {
-                console.log('👤 Creating new user profile');
-                return await createUserProfile(
-                  firebaseUser.uid,
-                  firebaseUser.email || '',
-                  firebaseUser.displayName || 'Anonymous'
-                );
+            // Set up real-time subscription after successful profile load
+            setTimeout(() => {
+              try {
+                console.log('🔔 Setting up real-time profile subscription');
+                const unsubscribeProfile = subscribeToUserProfile(firebaseUser.uid, (updatedUser) => {
+                  if (updatedUser) {
+                    console.log('🔄 Real-time profile update received');
+                    setCachedUser(firebaseUser.uid, updatedUser);
+                    setUser(updatedUser);
+                    setConnectionStatus('online');
+                    setLastError(null);
+                  }
+                });
+                
+                return () => {
+                  console.log('🛑 Cleaning up profile subscription');
+                  unsubscribeProfile();
+                };
+              } catch (error) {
+                console.warn('🔔 Failed to set up real-time subscription:', error);
+                // Don't set error for subscription failures if we have the profile
               }
-              
-              return profile;
-            });
-            
-            // Cache the profile
-            setCachedUser(firebaseUser.uid, userProfile);
+            }, 100);
           } else {
-            console.log('⚡ Using cached user profile');
+            throw new Error('Failed to load or create user profile');
           }
           
-          setUser(userProfile);
-          setConnectionStatus('online');
-          setLastError(null);
-          console.log(`📊 Profile loaded in ${(performance.now() - profileStart).toFixed(0)}ms`);
-          
-          // Set up real-time subscription after initial load (with error handling)
-          setTimeout(() => {
-            try {
-              console.log('🔔 Setting up real-time profile subscription');
-              const unsubscribeProfile = subscribeToUserProfile(firebaseUser.uid, (updatedUser) => {
-                if (updatedUser) {
-                  console.log('🔄 Real-time profile update received');
-                  setCachedUser(firebaseUser.uid, updatedUser);
-                  setUser(updatedUser);
-                  setConnectionStatus('online');
-                  setLastError(null);
-                }
-              });
-              
-              return () => {
-                console.log('🛑 Cleaning up profile subscription');
-                unsubscribeProfile();
-              };
-            } catch (error) {
-              console.warn('🔔 Failed to set up real-time subscription:', error);
-              setLastError(`Real-time updates unavailable`);
-            }
-          }, 100);
-          
         } catch (error) {
-          console.error('❌ Error loading user profile:', error);
+          console.error('❌ Error in auth state change handler:', error);
           setConnectionStatus('error');
-          setLastError(`Profile loading failed`);
+          setLastError('Profile loading failed - using offline mode');
           
-          // Try to use cached data as fallback
-          const cachedUser = loadCachedUserData();
-          if (cachedUser && cachedUser.id === firebaseUser.uid) {
-            console.log('💾 Using cached user data as fallback');
-            setUser(cachedUser);
+          // Final fallback: keep any existing user data
+          const existingCachedUser = loadCachedUserData();
+          if (existingCachedUser && existingCachedUser.id === firebaseUser.uid) {
+            console.log('💾 Keeping existing cached user data');
+            setUser(existingCachedUser);
           } else {
             setUser(null);
           }

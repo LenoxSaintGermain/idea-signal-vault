@@ -1,7 +1,7 @@
 
 import { initializeApp } from 'firebase/app';
 import { getAuth, connectAuthEmulator } from 'firebase/auth';
-import { getFirestore, connectFirestoreEmulator, enableNetwork, disableNetwork } from 'firebase/firestore';
+import { getFirestore, connectFirestoreEmulator, enableNetwork, disableNetwork, enableIndexedDbPersistence } from 'firebase/firestore';
 import { getAnalytics, isSupported } from 'firebase/analytics';
 
 const firebaseConfig = {
@@ -20,8 +20,36 @@ const app = initializeApp(firebaseConfig);
 // Initialize Auth with error handling
 export const auth = getAuth(app);
 
-// Initialize Firestore with enhanced configuration
+// Initialize Firestore with enhanced configuration and offline persistence
 export const db = getFirestore(app);
+
+// Firebase connection state
+let isFirebaseOnline = true;
+let persistenceEnabled = false;
+
+// Enable offline persistence
+const enableOfflinePersistence = async () => {
+  if (persistenceEnabled) return true;
+  
+  try {
+    await enableIndexedDbPersistence(db);
+    persistenceEnabled = true;
+    console.log('✅ Firebase offline persistence enabled');
+    return true;
+  } catch (error: any) {
+    if (error.code === 'failed-precondition') {
+      console.warn('🔌 Firebase persistence failed: Multiple tabs open');
+    } else if (error.code === 'unimplemented') {
+      console.warn('🔌 Firebase persistence not available in this browser');
+    } else {
+      console.warn('🔌 Firebase persistence failed:', error);
+    }
+    return false;
+  }
+};
+
+// Initialize offline persistence immediately
+enableOfflinePersistence();
 
 // Initialize Analytics only if supported (prevents browser compatibility issues)
 let analytics: any = null;
@@ -37,14 +65,16 @@ if (typeof window !== 'undefined') {
 
 export { analytics };
 
-// Enhanced connection management
+// Enhanced connection management with Firebase state awareness
 export const enableFirestoreNetwork = async () => {
   try {
     await enableNetwork(db);
+    isFirebaseOnline = true;
     console.log('✅ Firestore network enabled');
     return true;
   } catch (error) {
     console.error('❌ Failed to enable Firestore network:', error);
+    isFirebaseOnline = false;
     return false;
   }
 };
@@ -52,6 +82,7 @@ export const enableFirestoreNetwork = async () => {
 export const disableFirestoreNetwork = async () => {
   try {
     await disableNetwork(db);
+    isFirebaseOnline = false;
     console.log('🔌 Firestore network disabled');
     return true;
   } catch (error) {
@@ -60,16 +91,34 @@ export const disableFirestoreNetwork = async () => {
   }
 };
 
-// Connection health checker
+// Enhanced connection health checker with Firebase state awareness
 export const checkFirebaseConnection = async (): Promise<boolean> => {
   try {
+    // Test both network and Firebase client state
+    if (!navigator.onLine) {
+      console.log('🌐 Browser offline');
+      return false;
+    }
+    
     // Simple connectivity test
     await enableNetwork(db);
+    isFirebaseOnline = true;
+    console.log('✅ Firebase connection verified');
     return true;
   } catch (error) {
     console.error('🔌 Firebase connection check failed:', error);
+    isFirebaseOnline = false;
     return false;
   }
+};
+
+// Get Firebase connection state
+export const getFirebaseConnectionState = () => {
+  return {
+    isOnline: isFirebaseOnline,
+    hasPersistence: persistenceEnabled,
+    browserOnline: navigator.onLine
+  };
 };
 
 // Error categorization helper
