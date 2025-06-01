@@ -2,8 +2,9 @@
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/hooks/useAuth';
-import { TrendingUp, Coins, Lightbulb, Shield } from 'lucide-react';
+import { TrendingUp, Coins, Lightbulb, Shield, Users } from 'lucide-react';
 import { isAdmin } from '@/services/userService';
+import { Link } from 'react-router-dom';
 
 const Header = () => {
   const { user, logout } = useAuth();
@@ -12,13 +13,47 @@ const Header = () => {
     <header className="bg-gradient-to-r from-slate-900 via-purple-900 to-slate-900 text-white shadow-lg">
       <div className="container mx-auto px-4 py-4">
         <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-blue-500 rounded-lg flex items-center justify-center">
-              <TrendingUp className="w-6 h-6" />
-            </div>
-            <h1 className="text-2xl font-bold bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
-              Signal Vault
-            </h1>
+          <div className="flex items-center space-x-6">
+            <Link to="/" className="flex items-center space-x-3">
+              <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-blue-500 rounded-lg flex items-center justify-center">
+                <TrendingUp className="w-6 h-6" />
+              </div>
+              <h1 className="text-2xl font-bold bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
+                Signal Vault
+              </h1>
+            </Link>
+            
+            {/* Navigation Links */}
+            {user && (
+              <nav className="hidden md:flex items-center space-x-4">
+                <Link 
+                  to="/" 
+                  className="text-purple-200 hover:text-white transition-colors px-3 py-1 rounded-md hover:bg-white/10"
+                >
+                  Dashboard
+                </Link>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="text-purple-200 border-purple-300 hover:text-white hover:bg-white/10"
+                  onClick={() => {
+                    // For now, scroll to personas section in admin panel
+                    const adminTab = document.querySelector('[value="admin"]');
+                    if (adminTab) {
+                      (adminTab as HTMLElement).click();
+                      setTimeout(() => {
+                        const personasTab = document.querySelector('[value="personas"]');
+                        if (personasTab) (personasTab as HTMLElement).click();
+                      }, 100);
+                    }
+                  }}
+                >
+                  <Users className="w-4 h-4 mr-2" />
+                  Personas
+                </Button>
+              </nav>
+            )}
+            
             {user && isAdmin(user) && (
               <Badge className="bg-red-600 hover:bg-red-700 text-white">
                 <Shield className="w-3 h-3 mr-1" />

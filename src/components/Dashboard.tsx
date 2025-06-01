@@ -1,4 +1,3 @@
-
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/hooks/useAuth';
@@ -6,16 +5,20 @@ import IdeaCard from './IdeaCard';
 import PainPointCard from './PainPointCard';
 import PainPointFormatter from './PainPointFormatter';
 import ActivityFeed from './ActivityFeed';
-import { Coins, TrendingUp, Lightbulb, Award } from 'lucide-react';
+import { Coins, TrendingUp, Lightbulb, Award, Users, FileText } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import ROISimulator from './ROISimulator';
 import { Idea } from '@/types';
+import { PersonaProfile } from '@/types/persona';
 import { subscribeToIdeas } from '@/services/firestoreService';
+import { getAllPersonas } from '@/services/personaService';
 import { seedMockData } from '@/services/migrationService';
+import { seedSamplePersonas } from '@/services/personaSeedService';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/hooks/use-toast';
 import AdminPanel from './AdminPanel';
 import { isAdmin } from '@/services/userService';
+import { Link } from 'react-router-dom';
 
 const Dashboard = () => {
   const { user, firebaseUser } = useAuth();
@@ -23,6 +26,7 @@ const Dashboard = () => {
   const [isROIOpen, setIsROIOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('pain-points');
   const [ideas, setIdeas] = useState<Idea[]>([]);
+  const [personas, setPersonas] = useState<PersonaProfile[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -33,8 +37,19 @@ const Dashboard = () => {
       setLoading(false);
     });
 
+    loadPersonas();
+
     return unsubscribe;
   }, [firebaseUser]);
+
+  const loadPersonas = async () => {
+    try {
+      const allPersonas = await getAllPersonas();
+      setPersonas(allPersonas);
+    } catch (error) {
+      console.error('Error loading personas:', error);
+    }
+  };
 
   const handleOpenROI = (idea: Idea) => {
     setSelectedIdea(idea);
@@ -60,6 +75,23 @@ const Dashboard = () => {
       toast({
         title: "Seeding failed",
         description: "Could not seed the mock data",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleSeedPersonas = async () => {
+    try {
+      await seedSamplePersonas();
+      toast({
+        title: "Sample personas created!",
+        description: "5 sample personas have been added to test the concept doc routing",
+      });
+      await loadPersonas();
+    } catch (error) {
+      toast({
+        title: "Persona seeding failed",
+        description: "Could not create sample personas",
         variant: "destructive"
       });
     }
@@ -133,17 +165,66 @@ const Dashboard = () => {
           </Card>
         </div>
 
-        {/* Seed Data Button - Development Helper */}
-        {ideas.length === 0 && (
-          <Card className="mb-6 bg-blue-50 border-blue-200">
-            <CardContent className="p-6 text-center">
-              <h3 className="text-lg font-semibold text-blue-900 mb-2">Get Started</h3>
-              <p className="text-blue-700 mb-4">No ideas yet? Seed some sample pain points to explore the platform.</p>
-              <Button onClick={handleSeedData} className="bg-blue-600 hover:bg-blue-700">
-                Seed Sample Data
-              </Button>
+        {/* Personas Quick Access */}
+        {personas.length > 0 && (
+          <Card className="mb-6 bg-gradient-to-r from-purple-50 to-blue-50 border-purple-200">
+            <CardHeader className="pb-4">
+              <CardTitle className="flex items-center">
+                <Users className="w-5 h-5 mr-2 text-purple-600" />
+                Active Personas
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                {personas.slice(0, 5).map(persona => (
+                  <Link key={persona.id} to={`/persona/${persona.id}`}>
+                    <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+                      <CardContent className="p-4 text-center">
+                        <div className="w-12 h-12 bg-gradient-to-br from-purple-400 to-blue-400 rounded-full flex items-center justify-center mx-auto mb-2">
+                          <Users className="w-6 h-6 text-white" />
+                        </div>
+                        <h4 className="font-semibold text-sm mb-1">{persona.name}</h4>
+                        <p className="text-xs text-gray-600">
+                          {persona.conceptDocReviewQueue.length} pending
+                        </p>
+                      </CardContent>
+                    </Card>
+                  </Link>
+                ))}
+              </div>
             </CardContent>
           </Card>
+        )}
+
+        {/* Setup Cards */}
+        {(ideas.length === 0 || personas.length === 0) && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+            {ideas.length === 0 && (
+              <Card className="bg-blue-50 border-blue-200">
+                <CardContent className="p-6 text-center">
+                  <FileText className="w-12 h-12 text-blue-600 mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold text-blue-900 mb-2">Get Started with Ideas</h3>
+                  <p className="text-blue-700 mb-4">No ideas yet? Seed some sample pain points to explore the platform.</p>
+                  <Button onClick={handleSeedData} className="bg-blue-600 hover:bg-blue-700">
+                    Seed Sample Ideas
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+            
+            {personas.length === 0 && (
+              <Card className="bg-purple-50 border-purple-200">
+                <CardContent className="p-6 text-center">
+                  <Users className="w-12 h-12 text-purple-600 mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold text-purple-900 mb-2">Create Sample Personas</h3>
+                  <p className="text-purple-700 mb-4">Set up personas to test concept doc routing and review workflows.</p>
+                  <Button onClick={handleSeedPersonas} className="bg-purple-600 hover:bg-purple-700">
+                    Create Sample Personas
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+          </div>
         )}
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
