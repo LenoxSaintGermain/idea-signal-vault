@@ -1,0 +1,99 @@
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Users collection - users can only access their own profile
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+      // Admin can read all users
+      allow read: if request.auth != null && isAdmin();
+    }
+    
+    // Ideas collection - public read, authenticated write
+    match /ideas/{ideaId} {
+      allow read: if true; // Public read access
+      allow create: if request.auth != null && 
+        request.auth.uid == resource.data.authorId &&
+        validateIdeaData();
+      allow update: if request.auth != null && 
+        (request.auth.uid == resource.data.authorId || isAdmin()) &&
+        validateIdeaUpdate();
+      allow delete: if request.auth != null && 
+        (request.auth.uid == resource.data.authorId || isAdmin());
+    }
+    
+    // User activities - users can only read their own activities
+    match /user_activities/{activityId} {
+      allow read: if request.auth != null && 
+        (request.auth.uid == resource.data.userId || isAdmin());
+      allow create: if request.auth != null && 
+        request.auth.uid == request.resource.data.userId &&
+        validateActivityData();
+      allow update, delete: if false; // Activities are immutable
+    }
+    
+    // Comments - authenticated users can create, read public
+    match /comments/{commentId} {
+      allow read: if true; // Public read
+      allow create: if request.auth != null && 
+        request.auth.uid == request.resource.data.userId &&
+        validateCommentData();
+      allow update, delete: if request.auth != null && 
+        (request.auth.uid == resource.data.userId || isAdmin());
+    }
+    
+    // Detailed feedback - restricted access
+    match /detailed_feedback/{feedbackId} {
+      allow read: if request.auth != null && 
+        (request.auth.uid == resource.data.userId || isAdmin());
+      allow create: if request.auth != null && 
+        request.auth.uid == request.resource.data.userId &&
+        validateFeedbackData();
+      allow update, delete: if request.auth != null && 
+        (request.auth.uid == resource.data.userId || isAdmin());
+    }
+    
+    // Admin-only collections
+    match /admin_logs/{logId} {
+      allow read, write: if isAdmin();
+    }
+    
+    // Helper functions
+    function isAdmin() {
+      return request.auth != null && 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+    }
+    
+    function validateIdeaData() {
+      return request.resource.data.keys().hasAll(['title', 'summary', 'authorId']) &&
+        request.resource.data.title is string &&
+        request.resource.data.title.size() <= 200 &&
+        request.resource.data.summary is string &&
+        request.resource.data.summary.size() <= 1000;
+    }
+    
+    function validateIdeaUpdate() {
+      return !('authorId' in request.resource.data.diff(resource.data).affectedKeys());
+    }
+    
+    function validateActivityData() {
+      return request.resource.data.keys().hasAll(['userId', 'action', 'points']) &&
+        request.resource.data.points is number &&
+        request.resource.data.points >= 0 &&
+        request.resource.data.points <= 100;
+    }
+    
+    function validateCommentData() {
+      return request.resource.data.keys().hasAll(['ideaId', 'userId', 'comment']) &&
+        request.resource.data.comment is string &&
+        request.resource.data.comment.size() <= 1000;
+    }
+    
+    function validateFeedbackData() {
+      return request.resource.data.keys().hasAll(['ideaId', 'userId', 'feedback']) &&
+        request.resource.data.feedback is string &&
+        request.resource.data.feedback.size() <= 5000;
+    }
+  }
+}

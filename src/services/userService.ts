@@ -1,4 +1,3 @@
-
 import { 
   doc, 
   setDoc, 
@@ -16,6 +15,8 @@ import {
 import { db } from '@/lib/firebase';
 import { User, AdminStats, AdminActivity } from '@/types';
 import { getAllActivities } from './firestoreService';
+import { adminSecurity } from './adminSecurityService';
+import { validation } from './validationService';
 
 const ADMIN_EMAIL = 'lenox.paris@outlook.com';
 
@@ -29,6 +30,31 @@ export const createUserProfile = async (userId: string, email: string, displayNa
     ideasInfluenced: 0,
     estimatedTake: 0,
     isAdmin: email.toLowerCase() === ADMIN_EMAIL.toLowerCase(),
+    joinedAt: new Date(),
+    lastActive: new Date()
+  };
+  
+  await setDoc(userRef, userData);
+  return userData;
+};
+
+export const createUserProfileSecure = async (userId: string, email: string, displayName: string) => {
+  // Validate inputs
+  if (!validation.validateEmail(email)) {
+    throw new Error('Invalid email format');
+  }
+
+  const sanitizedDisplayName = validation.validateTextInput(displayName, 100);
+
+  const userRef = doc(db, 'users', userId);
+  const userData = {
+    id: userId,
+    email: email.toLowerCase().trim(),
+    displayName: sanitizedDisplayName,
+    signalPoints: 0,
+    ideasInfluenced: 0,
+    estimatedTake: 0,
+    isAdmin: false,
     joinedAt: new Date(),
     lastActive: new Date()
   };
@@ -158,14 +184,19 @@ const getActionDescription = (action: string): string => {
   }
 };
 
-export const isAdmin = (user: User | null): boolean => {
-  return user?.isAdmin === true || user?.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+export const isAdmin = async (user: User | null): Promise<boolean> => {
+  if (!user) return false;
+  
+  // Use secure admin verification
+  return await adminSecurity.verifyAdminRole(user.id);
 };
 
-export const upgradeUserToAdmin = async (userId: string) => {
-  const userRef = doc(db, 'users', userId);
-  await updateDoc(userRef, {
-    isAdmin: true,
-    lastActive: new Date()
-  });
+export const upgradeUserToAdmin = async (userId: string, currentAdminId: string) => {
+  // Use secure admin role granting
+  await adminSecurity.grantAdminRole(userId, currentAdminId);
+};
+
+export const revokeAdminRole = async (userId: string, currentAdminId: string) => {
+  // Use secure admin role revocation
+  await adminSecurity.revokeAdminRole(userId, currentAdminId);
 };
