@@ -70,7 +70,8 @@ const ConceptDocUpload = ({ onDocUploaded }: ConceptDocUploadProps) => {
         pdfUrl: formData.pdfUrl,
         tags: formData.tags,
         targetPersonas: formData.targetPersonas,
-        status: 'draft'
+        status: 'draft',
+        uploadedBy: firebaseUser.uid
       }, firebaseUser.uid);
 
       toast({

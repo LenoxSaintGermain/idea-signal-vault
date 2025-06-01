@@ -1,7 +1,7 @@
 
 import { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { User, AdminStats, Idea } from '@/types';
+import { User, AdminStats as AdminStatsType, Idea } from '@/types';
 import { PersonaProfile, ConceptDoc } from '@/types/persona';
 import { getAllUsers, getAdminStats } from '@/services/userService';
 import { getAllIdeas, deleteIdea, toggleIdeaFeatured } from '@/services/firestoreService';
@@ -12,7 +12,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { toast } from '@/hooks/use-toast';
 import EditIdeaDialog from './EditIdeaDialog';
 import AdminHeader from './admin/AdminHeader';
-import AdminStats from './admin/AdminStats';
+import AdminStatsComponent from './admin/AdminStats';
 import UserManagementTab from './admin/UserManagementTab';
 import ContentManagementTab from './admin/ContentManagementTab';
 import PersonasTab from './admin/PersonasTab';
@@ -22,7 +22,7 @@ import AnalyticsTab from './admin/AnalyticsTab';
 
 const AdminPanel = () => {
   const { firebaseUser } = useAuth();
-  const [stats, setStats] = useState<AdminStats | null>(null);
+  const [stats, setStats] = useState<AdminStatsType | null>(null);
   const [users, setUsers] = useState<User[]>([]);
   const [ideas, setIdeas] = useState<Idea[]>([]);
   const [personas, setPersonas] = useState<PersonaProfile[]>([]);
@@ -184,7 +184,7 @@ const AdminPanel = () => {
         onRefresh={loadAdminData}
       />
 
-      <AdminStats stats={stats} personas={personas} />
+      <AdminStatsComponent stats={stats} personas={personas} />
 
       <Tabs defaultValue="users" className="space-y-6">
         <TabsList className="grid w-full grid-cols-6">
