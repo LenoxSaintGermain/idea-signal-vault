@@ -184,6 +184,28 @@ export const reviewConceptDoc = async (
   return true;
 };
 
+export const getPersonaConceptDocs = async (personaId: string) => {
+  // Get the persona to access its concept doc catalog
+  const persona = await getPersonaById(personaId);
+  if (!persona) return [];
+  
+  // Import the concept doc service to get the actual docs
+  const { getConceptDocById } = await import('./supabaseConceptDocService');
+  
+  // Fetch all concept docs in the persona's catalog
+  const conceptDocs = [];
+  for (const docId of persona.conceptDocCatalog) {
+    try {
+      const doc = await getConceptDocById(docId);
+      if (doc) conceptDocs.push(doc);
+    } catch (error) {
+      console.error(`Failed to fetch concept doc ${docId}:`, error);
+    }
+  }
+  
+  return conceptDocs;
+};
+
 export const subscribeToPersonas = (callback: (personas: PersonaProfile[]) => void) => {
   const subscription = supabase
     .channel('personas_changes')

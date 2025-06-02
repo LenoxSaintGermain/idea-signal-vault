@@ -8,14 +8,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useAuth } from '@/hooks/useSupabaseAuth';
 import { getPersonaById, getPersonaConceptDocs } from '@/services/supabasePersonaService';
-import { getConceptDocsByIds } from '@/services/supabaseConceptDocService';
-import { Persona, ConceptDoc } from '@/types/persona';
+import { getConceptDocsByPersona } from '@/services/supabaseConceptDocService';
+import { PersonaProfile, ConceptDoc } from '@/types/persona';
 import { User, ArrowLeft, Calendar, Heart, Clock } from 'lucide-react';
 
 const PersonaProfilePage = () => {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
-  const [persona, setPersona] = useState<Persona | null>(null);
+  const [persona, setPersona] = useState<PersonaProfile | null>(null);
   const [conceptDocs, setConceptDocs] = useState<ConceptDoc[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -36,7 +36,7 @@ const PersonaProfilePage = () => {
         setPersona(personaData);
 
         // Load concept docs for this persona
-        const docs = await getPersonaConceptDocs(id);
+        const docs = await getConceptDocsByPersona(id);
         setConceptDocs(docs);
 
       } catch (err) {
