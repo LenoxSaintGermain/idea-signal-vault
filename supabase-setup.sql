@@ -2,9 +2,6 @@
 -- Signal Vault Database Schema Setup
 -- Run this in your Supabase SQL Editor
 
--- Enable RLS on auth.users if not already enabled
-ALTER TABLE auth.users ENABLE ROW LEVEL SECURITY;
-
 -- Create users table
 CREATE TABLE IF NOT EXISTS users (
   id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -120,16 +117,82 @@ CREATE TABLE IF NOT EXISTS admin_logs (
   ip_address INET
 );
 
--- Enable RLS on all tables
-ALTER TABLE users ENABLE ROW LEVEL SECURITY;
-ALTER TABLE ideas ENABLE ROW LEVEL SECURITY;
-ALTER TABLE user_activities ENABLE ROW LEVEL SECURITY;
-ALTER TABLE comments ENABLE ROW LEVEL SECURITY;
-ALTER TABLE detailed_feedback ENABLE ROW LEVEL SECURITY;
-ALTER TABLE personas ENABLE ROW LEVEL SECURITY;
-ALTER TABLE concept_docs ENABLE ROW LEVEL SECURITY;
-ALTER TABLE persona_reviews ENABLE ROW LEVEL SECURITY;
-ALTER TABLE admin_logs ENABLE ROW LEVEL SECURITY;
+-- Enable RLS on all custom tables (auth.users already has RLS enabled by Supabase)
+DO $$ BEGIN
+  ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+EXCEPTION WHEN OTHERS THEN
+  RAISE NOTICE 'RLS already enabled on users table';
+END $$;
+
+DO $$ BEGIN
+  ALTER TABLE ideas ENABLE ROW LEVEL SECURITY;
+EXCEPTION WHEN OTHERS THEN
+  RAISE NOTICE 'RLS already enabled on ideas table';
+END $$;
+
+DO $$ BEGIN
+  ALTER TABLE user_activities ENABLE ROW LEVEL SECURITY;
+EXCEPTION WHEN OTHERS THEN
+  RAISE NOTICE 'RLS already enabled on user_activities table';
+END $$;
+
+DO $$ BEGIN
+  ALTER TABLE comments ENABLE ROW LEVEL SECURITY;
+EXCEPTION WHEN OTHERS THEN
+  RAISE NOTICE 'RLS already enabled on comments table';
+END $$;
+
+DO $$ BEGIN
+  ALTER TABLE detailed_feedback ENABLE ROW LEVEL SECURITY;
+EXCEPTION WHEN OTHERS THEN
+  RAISE NOTICE 'RLS already enabled on detailed_feedback table';
+END $$;
+
+DO $$ BEGIN
+  ALTER TABLE personas ENABLE ROW LEVEL SECURITY;
+EXCEPTION WHEN OTHERS THEN
+  RAISE NOTICE 'RLS already enabled on personas table';
+END $$;
+
+DO $$ BEGIN
+  ALTER TABLE concept_docs ENABLE ROW LEVEL SECURITY;
+EXCEPTION WHEN OTHERS THEN
+  RAISE NOTICE 'RLS already enabled on concept_docs table';
+END $$;
+
+DO $$ BEGIN
+  ALTER TABLE persona_reviews ENABLE ROW LEVEL SECURITY;
+EXCEPTION WHEN OTHERS THEN
+  RAISE NOTICE 'RLS already enabled on persona_reviews table';
+END $$;
+
+DO $$ BEGIN
+  ALTER TABLE admin_logs ENABLE ROW LEVEL SECURITY;
+EXCEPTION WHEN OTHERS THEN
+  RAISE NOTICE 'RLS already enabled on admin_logs table';
+END $$;
+
+-- Drop existing policies if they exist to avoid conflicts
+DROP POLICY IF EXISTS "Users can view their own profile" ON users;
+DROP POLICY IF EXISTS "Users can update their own profile" ON users;
+DROP POLICY IF EXISTS "Allow user creation on signup" ON users;
+DROP POLICY IF EXISTS "Ideas are viewable by everyone" ON ideas;
+DROP POLICY IF EXISTS "Users can create ideas" ON ideas;
+DROP POLICY IF EXISTS "Users can update their own ideas" ON ideas;
+DROP POLICY IF EXISTS "Users can view their own activities" ON user_activities;
+DROP POLICY IF EXISTS "Users can create their own activities" ON user_activities;
+DROP POLICY IF EXISTS "Comments are viewable by everyone" ON comments;
+DROP POLICY IF EXISTS "Users can create comments" ON comments;
+DROP POLICY IF EXISTS "Feedback is viewable by everyone" ON detailed_feedback;
+DROP POLICY IF EXISTS "Users can create feedback" ON detailed_feedback;
+DROP POLICY IF EXISTS "Personas are viewable by everyone" ON personas;
+DROP POLICY IF EXISTS "Only authenticated users can manage personas" ON personas;
+DROP POLICY IF EXISTS "Concept docs are viewable by everyone" ON concept_docs;
+DROP POLICY IF EXISTS "Users can create concept docs" ON concept_docs;
+DROP POLICY IF EXISTS "Persona reviews are viewable by everyone" ON persona_reviews;
+DROP POLICY IF EXISTS "Only authenticated users can create reviews" ON persona_reviews;
+DROP POLICY IF EXISTS "Only admins can view admin logs" ON admin_logs;
+DROP POLICY IF EXISTS "Only admins can create admin logs" ON admin_logs;
 
 -- RLS Policies for users table
 CREATE POLICY "Users can view their own profile" ON users
@@ -234,7 +297,8 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Create trigger to automatically set admin status on user creation
-CREATE OR REPLACE TRIGGER trigger_set_admin_status
+DROP TRIGGER IF EXISTS trigger_set_admin_status ON users;
+CREATE TRIGGER trigger_set_admin_status
   BEFORE INSERT OR UPDATE ON users
   FOR EACH ROW
   EXECUTE FUNCTION set_admin_status();
