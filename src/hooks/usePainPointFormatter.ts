@@ -1,11 +1,10 @@
-
 import { useState } from 'react';
 import { formatPainPoint } from '@/services/openaiService';
 import { toast } from '@/hooks/use-toast';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/hooks/useSupabaseAuth';
 
 export const usePainPointFormatter = () => {
-  const { firebaseUser } = useAuth();
+  const { supabaseUser } = useAuth();
   const [rawIdea, setRawIdea] = useState('');
   const [apiKey, setApiKey] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -66,6 +65,6 @@ export const usePainPointFormatter = () => {
     setFormattedResult,
     handleFormat,
     clearForm,
-    firebaseUser
+    supabaseUser
   };
 };

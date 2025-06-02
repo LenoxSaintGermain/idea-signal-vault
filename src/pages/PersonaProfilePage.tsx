@@ -1,20 +1,20 @@
-
 import { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ArrowLeft, User, FileText, Heart, Clock } from 'lucide-react';
+import { ArrowLeft, User, FileText, Calendar, ExternalLink } from 'lucide-react';
 import { PersonaProfile, ConceptDoc } from '@/types/persona';
-import { getPersonaById } from '@/services/personaService';
-import { getConceptDocById } from '@/services/conceptDocService';
+import { getPersonaById } from '@/services/supabasePersonaService';
+import { getConceptDocsByPersona } from '@/services/supabaseConceptDocService';
 import PersonaReviewFeed from '@/components/PersonaReviewFeed';
 import Header from '@/components/Header';
 import { toast } from '@/hooks/use-toast';
 
 const PersonaProfilePage = () => {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const [persona, setPersona] = useState<PersonaProfile | null>(null);
   const [catalogDocs, setCatalogDocs] = useState<ConceptDoc[]>([]);
   const [loading, setLoading] = useState(true);
@@ -42,7 +42,7 @@ const PersonaProfilePage = () => {
 
       // Load catalog documents
       const catalogDocuments = await Promise.all(
-        personaData.conceptDocCatalog.map(docId => getConceptDocById(docId))
+        personaData.conceptDocCatalog.map(docId => getConceptDocsByPersona(docId))
       );
       setCatalogDocs(catalogDocuments.filter(doc => doc !== null) as ConceptDoc[]);
     } catch (error) {

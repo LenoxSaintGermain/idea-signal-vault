@@ -1,14 +1,13 @@
-
 import { useState } from 'react';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ArrowUp, Plus, X } from 'lucide-react';
 import { Idea } from '@/types';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/hooks/useSupabaseAuth';
 import { toast } from '@/hooks/use-toast';
-import { upvoteIdea } from '@/services/firestoreService';
-import { updateUserStats } from '@/services/userService';
+import { upvoteIdea } from '@/services/supabaseService';
+import { updateUserStats } from '@/services/supabaseUserService';
 
 interface PainPointCardProps {
   idea: Idea;
@@ -16,13 +15,13 @@ interface PainPointCardProps {
 }
 
 const PainPointCard = ({ idea, onOpenROI }: PainPointCardProps) => {
-  const { user, firebaseUser } = useAuth();
+  const { user, supabaseUser } = useAuth();
   const [isExpanded, setIsExpanded] = useState(false);
   const [isUpvoted, setIsUpvoted] = useState(false);
   const [isUpvoting, setIsUpvoting] = useState(false);
 
   const handleUpvote = async () => {
-    if (!user || !firebaseUser) {
+    if (!user || !supabaseUser) {
       toast({
         title: "Sign in required",
         description: "Please sign in to vote on pain points",
@@ -35,8 +34,8 @@ const PainPointCard = ({ idea, onOpenROI }: PainPointCardProps) => {
 
     setIsUpvoting(true);
     try {
-      await upvoteIdea(idea.id, firebaseUser.uid);
-      await updateUserStats(firebaseUser.uid, 2);
+      await upvoteIdea(idea.id, supabaseUser.id);
+      await updateUserStats(supabaseUser.id, 2);
       
       setIsUpvoted(!isUpvoted);
       

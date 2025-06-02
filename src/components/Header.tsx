@@ -1,9 +1,9 @@
 
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/hooks/useSupabaseAuth';
 import { TrendingUp, Coins, Lightbulb, Shield, Users } from 'lucide-react';
-import { isAdmin } from '@/services/userService';
+import { isAdmin } from '@/services/supabaseUserService';
 import { Link } from 'react-router-dom';
 
 const Header = () => {

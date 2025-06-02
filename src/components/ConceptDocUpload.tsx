@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -7,9 +6,9 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Upload, X, Plus } from 'lucide-react';
-import { createConceptDoc } from '@/services/conceptDocService';
-import { getAllPersonas } from '@/services/personaService';
-import { useAuth } from '@/hooks/useAuth';
+import { createConceptDoc } from '@/services/supabaseConceptDocService';
+import { getAllPersonas } from '@/services/supabasePersonaService';
+import { useAuth } from '@/hooks/useSupabaseAuth';
 import { toast } from '@/hooks/use-toast';
 
 interface ConceptDocUploadProps {
@@ -17,7 +16,7 @@ interface ConceptDocUploadProps {
 }
 
 const ConceptDocUpload = ({ onDocUploaded }: ConceptDocUploadProps) => {
-  const { firebaseUser } = useAuth();
+  const { supabaseUser } = useAuth();
   const [formData, setFormData] = useState({
     title: '',
     subtitle: '',
@@ -42,7 +41,7 @@ const ConceptDocUpload = ({ onDocUploaded }: ConceptDocUploadProps) => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!firebaseUser) {
+    if (!supabaseUser) {
       toast({
         title: "Authentication required",
         description: "Please sign in to upload concept docs",
@@ -71,8 +70,8 @@ const ConceptDocUpload = ({ onDocUploaded }: ConceptDocUploadProps) => {
         tags: formData.tags,
         targetPersonas: formData.targetPersonas,
         status: 'draft',
-        uploadedBy: firebaseUser.uid
-      }, firebaseUser.uid);
+        uploadedBy: supabaseUser.id
+      }, supabaseUser.id);
 
       toast({
         title: "Concept doc uploaded",

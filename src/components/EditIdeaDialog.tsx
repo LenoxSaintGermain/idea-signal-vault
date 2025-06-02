@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Idea } from '@/types';
-import { updateIdea } from '@/services/firestoreService';
+import { updateIdea } from '@/services/supabaseService';
 import { toast } from '@/hooks/use-toast';
 
 interface EditIdeaDialogProps {

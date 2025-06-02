@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -8,8 +7,8 @@ import { Label } from '@/components/ui/label';
 import { Heart, X, ExternalLink, FileText, Calendar } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { PersonaProfile, ConceptDoc } from '@/types/persona';
-import { getConceptDocById } from '@/services/conceptDocService';
-import { reviewConceptDoc } from '@/services/personaService';
+import { getConceptDocById } from '@/services/supabaseConceptDocService';
+import { reviewConceptDoc } from '@/services/supabasePersonaService';
 
 interface PersonaReviewFeedProps {
   persona: PersonaProfile;

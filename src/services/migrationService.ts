@@ -1,21 +1,35 @@
 
-import { createIdea } from './firestoreService';
 import { mockIdeas } from '@/data/mockData';
+import { createIdea } from './supabaseService';
 
-export const seedMockData = async (userId: string) => {
-  console.log('Starting data migration...');
-  
-  try {
-    for (const idea of mockIdeas) {
-      const { id, createdAt, ...ideaData } = idea;
-      await createIdea(ideaData, userId);
-      console.log(`Migrated idea: ${idea.headline || idea.title}`);
-    }
+export class MigrationService {
+  async seedMockData(userId: string) {
+    console.log('🚀 Starting Supabase mock data seeding...');
     
-    console.log('Data migration completed successfully!');
-    return true;
-  } catch (error) {
-    console.error('Migration failed:', error);
-    return false;
+    try {
+      let successCount = 0;
+      let failCount = 0;
+      
+      for (const idea of mockIdeas) {
+        try {
+          const { id, createdAt, ...ideaData } = idea;
+          await createIdea(ideaData, userId);
+          successCount++;
+          console.log(`✅ Seeded idea: ${idea.headline || idea.title}`);
+        } catch (error) {
+          failCount++;
+          console.error(`❌ Failed to seed idea: ${idea.headline || idea.title}`, error);
+        }
+      }
+      
+      console.log(`📊 Seeding complete: ${successCount} success, ${failCount} failed`);
+      return successCount > 0;
+    } catch (error) {
+      console.error('❌ Mock data seeding failed:', error);
+      return false;
+    }
   }
-};
+}
+
+export const migrationService = new MigrationService();
+export const seedMockData = (userId: string) => migrationService.seedMockData(userId);

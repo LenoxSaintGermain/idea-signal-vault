@@ -4,13 +4,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { toast } from '@/hooks/use-toast';
-import { createIdea } from '@/services/firestoreService';
+import { createIdea } from '@/services/supabaseService';
 import { Idea } from '@/types';
-import { User as FirebaseUser } from 'firebase/auth';
+import { User as SupabaseUser } from '@supabase/supabase-js';
 
 interface PainPointFormatterResultProps {
   formattedResult: any;
-  firebaseUser: FirebaseUser | null;
+  supabaseUser: SupabaseUser | null;
   rawIdea: string;
   onPainPointAdded?: () => void;
   onClearForm: () => void;
@@ -18,7 +18,7 @@ interface PainPointFormatterResultProps {
 
 const PainPointFormatterResult = ({
   formattedResult,
-  firebaseUser,
+  supabaseUser,
   rawIdea,
   onPainPointAdded,
   onClearForm
@@ -26,7 +26,7 @@ const PainPointFormatterResult = ({
   const [isAddingToGallery, setIsAddingToGallery] = useState(false);
 
   const handleAddToGallery = async () => {
-    if (!formattedResult || !firebaseUser) return;
+    if (!formattedResult || !supabaseUser) return;
 
     setIsAddingToGallery(true);
     
@@ -42,13 +42,13 @@ const PainPointFormatterResult = ({
         valuationEstimate: Math.floor(Math.random() * 5000000) + 500000,
         voteCount: 0,
         commentCount: 0,
-        authorId: firebaseUser.uid,
+        authorId: supabaseUser.id,
         totalPoints: 0,
         isPainPoint: true,
         cta: formattedResult.cta || 'Request Full Concept'
       };
 
-      await createIdea(newPainPoint, firebaseUser.uid);
+      await createIdea(newPainPoint, supabaseUser.id);
 
       toast({
         title: "Added to Gallery!",

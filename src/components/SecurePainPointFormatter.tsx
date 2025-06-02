@@ -5,8 +5,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { toast } from '@/hooks/use-toast';
-import { useAuth } from '@/hooks/useAuth';
-import { createIdea } from '@/services/firestoreService';
+import { useAuth } from '@/hooks/useSupabaseAuth';
+import { createIdea } from '@/services/supabaseService';
 import { validation } from '@/services/validationService';
 import { SecureApiService } from '@/services/secureApiService';
 import { Idea } from '@/types';
@@ -17,7 +17,7 @@ interface SecurePainPointFormatterProps {
 }
 
 const SecurePainPointFormatter = ({ onPainPointAdded }: SecurePainPointFormatterProps) => {
-  const { firebaseUser, user } = useAuth();
+  const { supabaseUser, user } = useAuth();
   const [rawIdea, setRawIdea] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isAddingToGallery, setIsAddingToGallery] = useState(false);
@@ -32,7 +32,7 @@ const SecurePainPointFormatter = ({ onPainPointAdded }: SecurePainPointFormatter
       const sanitizedIdea = validation.validateTextInput(rawIdea, 5000);
       
       // Rate limiting check
-      const rateLimitKey = `format_${firebaseUser?.uid}`;
+      const rateLimitKey = `format_${supabaseUser?.uid}`;
       if (!validation.checkRateLimit(rateLimitKey, 5, 300000)) { // 5 requests per 5 minutes
         setRateLimitExceeded(true);
         toast({
@@ -43,7 +43,7 @@ const SecurePainPointFormatter = ({ onPainPointAdded }: SecurePainPointFormatter
         return;
       }
 
-      if (!firebaseUser) {
+      if (!supabaseUser) {
         toast({
           title: "Authentication required",
           description: "Please sign in to use this feature",
@@ -56,7 +56,7 @@ const SecurePainPointFormatter = ({ onPainPointAdded }: SecurePainPointFormatter
       setRateLimitExceeded(false);
 
       // Get user token for secure API call
-      const userToken = await firebaseUser.getIdToken();
+      const userToken = await supabaseUser.getIdToken();
       
       const result = await secureApi.formatPainPoint(sanitizedIdea, userToken);
       
@@ -78,7 +78,7 @@ const SecurePainPointFormatter = ({ onPainPointAdded }: SecurePainPointFormatter
   };
 
   const handleAddToGallery = async () => {
-    if (!formattedResult || !firebaseUser || !user) return;
+    if (!formattedResult || !supabaseUser || !user) return;
 
     setIsAddingToGallery(true);
     
@@ -103,13 +103,13 @@ const SecurePainPointFormatter = ({ onPainPointAdded }: SecurePainPointFormatter
         valuationEstimate: Math.floor(Math.random() * 5000000) + 500000,
         voteCount: 0,
         commentCount: 0,
-        authorId: firebaseUser.uid,
+        authorId: supabaseUser.id,
         totalPoints: 0,
         isPainPoint: true,
         cta: formattedResult.cta || 'Request Full Concept'
       };
 
-      await createIdea(newPainPoint, firebaseUser.uid);
+      await createIdea(newPainPoint, supabaseUser.id);
 
       toast({
         title: "Added to Gallery!",
@@ -183,13 +183,13 @@ const SecurePainPointFormatter = ({ onPainPointAdded }: SecurePainPointFormatter
 
           <Button
             onClick={handleFormat}
-            disabled={isLoading || !rawIdea.trim() || !firebaseUser || rateLimitExceeded}
+            disabled={isLoading || !rawIdea.trim() || !supabaseUser || rateLimitExceeded}
             className="w-full bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-700 hover:to-orange-700"
           >
             {isLoading ? 'Formatting...' : 'Format as Pain Point'}
           </Button>
 
-          {!firebaseUser && (
+          {!supabaseUser && (
             <Alert>
               <AlertTriangle className="h-4 w-4" />
               <AlertDescription>
@@ -251,7 +251,7 @@ const SecurePainPointFormatter = ({ onPainPointAdded }: SecurePainPointFormatter
               </Button>
               <Button
                 onClick={handleAddToGallery}
-                disabled={isAddingToGallery || !formattedResult.headline || !formattedResult.subheadline || !firebaseUser}
+                disabled={isAddingToGallery || !formattedResult.headline || !formattedResult.subheadline || !supabaseUser}
                 variant="outline"
                 className="flex-1 hover:bg-orange-50 hover:text-orange-700 hover:border-orange-200 disabled:opacity-50"
               >

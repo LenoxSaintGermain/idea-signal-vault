@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/hooks/useSupabaseAuth';
 import IdeaCard from './IdeaCard';
 import PainPointCard from './PainPointCard';
 import PainPointFormatter from './PainPointFormatter';
@@ -10,18 +10,17 @@ import { useState, useEffect } from 'react';
 import ROISimulator from './ROISimulator';
 import { Idea } from '@/types';
 import { PersonaProfile } from '@/types/persona';
-import { subscribeToIdeas } from '@/services/firestoreService';
-import { getAllPersonas } from '@/services/personaService';
-import { seedMockData } from '@/services/migrationService';
-import { seedSamplePersonas } from '@/services/personaSeedService';
+import { subscribeToIdeas } from '@/services/supabaseService';
+import { getAllPersonas } from '@/services/supabasePersonaService';
+import { supabaseMigrationService } from '@/services/supabaseMigrationService';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/hooks/use-toast';
 import AdminPanel from './AdminPanel';
-import { isAdmin } from '@/services/userService';
+import { isAdmin } from '@/services/supabaseUserService';
 import { Link } from 'react-router-dom';
 
 const Dashboard = () => {
-  const { user, firebaseUser } = useAuth();
+  const { user, supabaseUser } = useAuth();
   const [selectedIdea, setSelectedIdea] = useState<Idea | null>(null);
   const [isROIOpen, setIsROIOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('pain-points');
@@ -30,7 +29,7 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!firebaseUser) return;
+    if (!supabaseUser) return;
 
     const unsubscribe = subscribeToIdeas((newIdeas) => {
       setIdeas(newIdeas);
@@ -40,7 +39,7 @@ const Dashboard = () => {
     loadPersonas();
 
     return unsubscribe;
-  }, [firebaseUser]);
+  }, [supabaseUser]);
 
   const loadPersonas = async () => {
     try {
@@ -61,14 +60,14 @@ const Dashboard = () => {
   };
 
   const handleSeedData = async () => {
-    if (!firebaseUser) return;
+    if (!supabaseUser) return;
     
     try {
-      const success = await seedMockData(firebaseUser.uid);
-      if (success) {
+      const result = await supabaseMigrationService.seedMockIdeas(supabaseUser.id);
+      if (result.success) {
         toast({
           title: "Data seeded successfully!",
-          description: "Mock pain points have been added to your Firestore database",
+          description: "Mock pain points have been added to your Supabase database",
         });
       }
     } catch (error) {
@@ -82,12 +81,14 @@ const Dashboard = () => {
 
   const handleSeedPersonas = async () => {
     try {
-      await seedSamplePersonas();
-      toast({
-        title: "Sample personas created!",
-        description: "5 sample personas have been added to test the concept doc routing",
-      });
-      await loadPersonas();
+      const result = await supabaseMigrationService.seedSamplePersonas();
+      if (result.success) {
+        toast({
+          title: "Sample personas created!",
+          description: "Sample personas have been added to test the concept doc routing",
+        });
+        await loadPersonas();
+      }
     } catch (error) {
       toast({
         title: "Persona seeding failed",

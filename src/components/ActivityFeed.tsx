@@ -4,9 +4,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Coins, Clock, TrendingUp, MessageCircle, Star, FileText } from 'lucide-react';
-import { subscribeToActivities } from '@/services/firestoreService';
-import { getAllUsers } from '@/services/userService';
-import { getAllIdeas } from '@/services/firestoreService';
+import { subscribeToActivities } from '@/services/supabaseService';
+import { getAllUsers } from '@/services/supabaseUserService';
+import { getAllIdeas } from '@/services/supabaseService';
 import { User, Idea } from '@/types';
 
 interface Activity {
