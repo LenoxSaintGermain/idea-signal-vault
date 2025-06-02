@@ -2,12 +2,12 @@ import { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { User, AdminStats as AdminStatsType, Idea } from '@/types';
 import { PersonaProfile, ConceptDoc } from '@/types/persona';
-import { getAllUsers, getAdminStats } from '@/services/userService';
-import { getAllIdeas, deleteIdea, toggleIdeaFeatured } from '@/services/firestoreService';
-import { getAllPersonas, deletePersona } from '@/services/personaService';
-import { getAllConceptDocs, deleteConceptDoc } from '@/services/conceptDocService';
-import { enhancedMigrationService } from '@/services/enhancedMigrationService';
-import { useAuth } from '@/hooks/useAuth';
+import { getAllUsers, getAdminStats } from '@/services/supabaseUserService';
+import { getAllIdeas, deleteIdea, toggleIdeaFeatured } from '@/services/supabaseService';
+import { getAllPersonas, deletePersona } from '@/services/supabasePersonaService';
+import { getAllConceptDocs, deleteConceptDoc } from '@/services/supabaseConceptDocService';
+import { supabaseMigrationService } from '@/services/supabaseMigrationService';
+import { useAuth } from '@/hooks/useSupabaseAuth';
 import { toast } from '@/hooks/use-toast';
 import EditIdeaDialog from './EditIdeaDialog';
 import AdminHeader from './admin/AdminHeader';
@@ -18,10 +18,9 @@ import PersonasTab from './admin/PersonasTab';
 import ConceptDocsTab from './admin/ConceptDocsTab';
 import ActivityTab from './admin/ActivityTab';
 import AnalyticsTab from './admin/AnalyticsTab';
-import FirebaseDebugPanel from './admin/FirebaseDebugPanel';
 
 const AdminPanel = () => {
-  const { firebaseUser } = useAuth();
+  const { supabaseUser } = useAuth();
   const [stats, setStats] = useState<AdminStatsType | null>(null);
   const [users, setUsers] = useState<User[]>([]);
   const [ideas, setIdeas] = useState<Idea[]>([]);
@@ -62,21 +61,11 @@ const AdminPanel = () => {
   };
 
   const handleSeedData = async () => {
-    if (!firebaseUser) return;
+    if (!supabaseUser) return;
     
     try {
       setLoading(true);
-      
-      // Test connectivity first
-      const isConnected = await enhancedMigrationService.testDatabaseConnectivity();
-      if (!isConnected) {
-        toast({
-          title: "Connection issue detected",
-          description: "Running recovery sequence...",
-        });
-      }
-      
-      const result = await enhancedMigrationService.seedMockIdeas(firebaseUser.uid, true);
+      const result = await supabaseMigrationService.seedMockIdeas(supabaseUser.id);
       
       if (result.success) {
         toast({
@@ -86,7 +75,7 @@ const AdminPanel = () => {
         await loadAdminData();
       } else {
         toast({
-          title: "Seeding partially failed",
+          title: "Seeding failed",
           description: `${result.failCount} ideas failed to seed`,
           variant: "destructive"
         });
@@ -105,7 +94,7 @@ const AdminPanel = () => {
   const handleSeedPersonas = async () => {
     try {
       setLoading(true);
-      const result = await enhancedMigrationService.seedSamplePersonas(true);
+      const result = await supabaseMigrationService.seedSamplePersonas();
       
       if (result.success) {
         toast({
@@ -232,19 +221,23 @@ const AdminPanel = () => {
 
       <AdminStatsComponent stats={stats} personas={personas} />
 
-      <Tabs defaultValue="debug" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-7">
-          <TabsTrigger value="debug">Debug</TabsTrigger>
-          <TabsTrigger value="users">Users</TabsTrigger>
+      <Tabs defaultValue="content" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="content">Content</TabsTrigger>
+          <TabsTrigger value="users">Users</TabsTrigger>
           <TabsTrigger value="personas">Personas</TabsTrigger>
           <TabsTrigger value="concept-docs">Docs</TabsTrigger>
           <TabsTrigger value="activity">Activity</TabsTrigger>
           <TabsTrigger value="analytics">Analytics</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="debug" className="space-y-6">
-          <FirebaseDebugPanel />
+        <TabsContent value="content" className="space-y-6">
+          <ContentManagementTab 
+            ideas={ideas}
+            onEditIdea={setEditingIdea}
+            onToggleFeatured={handleToggleFeatured}
+            onDeleteIdea={handleDeleteIdea}
+          />
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <button
               onClick={handleSeedPersonas}
@@ -259,15 +252,6 @@ const AdminPanel = () => {
 
         <TabsContent value="users">
           <UserManagementTab users={users} />
-        </TabsContent>
-
-        <TabsContent value="content">
-          <ContentManagementTab 
-            ideas={ideas}
-            onEditIdea={setEditingIdea}
-            onToggleFeatured={handleToggleFeatured}
-            onDeleteIdea={handleDeleteIdea}
-          />
         </TabsContent>
 
         <TabsContent value="personas">
