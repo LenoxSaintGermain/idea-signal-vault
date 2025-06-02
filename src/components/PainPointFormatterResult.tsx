@@ -6,22 +6,21 @@ import { Badge } from '@/components/ui/badge';
 import { toast } from '@/hooks/use-toast';
 import { createIdea } from '@/services/supabaseService';
 import { Idea } from '@/types';
-import { User as SupabaseUser } from '@supabase/supabase-js';
 
 interface PainPointFormatterResultProps {
   formattedResult: any;
-  supabaseUser: SupabaseUser | null;
+  supabaseUser: any;
   rawIdea: string;
   onPainPointAdded?: () => void;
   onClearForm: () => void;
 }
 
-const PainPointFormatterResult = ({
-  formattedResult,
-  supabaseUser,
-  rawIdea,
-  onPainPointAdded,
-  onClearForm
+const PainPointFormatterResult = ({ 
+  formattedResult, 
+  supabaseUser, 
+  rawIdea, 
+  onPainPointAdded, 
+  onClearForm 
 }: PainPointFormatterResultProps) => {
   const [isAddingToGallery, setIsAddingToGallery] = useState(false);
 
@@ -35,9 +34,9 @@ const PainPointFormatterResult = ({
         headline: formattedResult.headline,
         subheadline: formattedResult.subheadline,
         title: formattedResult.headline,
-        summary: formattedResult.solution,
+        summary: formattedResult.solution || formattedResult.subheadline,
         painPoint: `Generated from user input: ${rawIdea}`,
-        solution: formattedResult.solution,
+        solution: formattedResult.solution || 'Solution to be detailed',
         tags: formattedResult.tags || [],
         valuationEstimate: Math.floor(Math.random() * 5000000) + 500000,
         voteCount: 0,
@@ -134,7 +133,7 @@ const PainPointFormatterResult = ({
           </Button>
           <Button
             onClick={handleAddToGallery}
-            disabled={isAddingToGallery || !formattedResult.headline || !formattedResult.subheadline || !firebaseUser}
+            disabled={isAddingToGallery || !formattedResult.headline || !formattedResult.subheadline || !supabaseUser}
             variant="outline"
             className="flex-1 hover:bg-orange-50 hover:text-orange-700 hover:border-orange-200 disabled:opacity-50"
           >

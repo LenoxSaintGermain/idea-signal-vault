@@ -17,7 +17,7 @@ const PainPointFormatter = ({ onPainPointAdded }: PainPointFormatterProps) => {
     formattedResult,
     handleFormat,
     clearForm,
-    firebaseUser
+    supabaseUser
   } = usePainPointFormatter();
 
   return (
@@ -33,7 +33,7 @@ const PainPointFormatter = ({ onPainPointAdded }: PainPointFormatterProps) => {
 
       <PainPointFormatterResult
         formattedResult={formattedResult}
-        firebaseUser={firebaseUser}
+        supabaseUser={supabaseUser}
         rawIdea={rawIdea}
         onPainPointAdded={onPainPointAdded}
         onClearForm={clearForm}
