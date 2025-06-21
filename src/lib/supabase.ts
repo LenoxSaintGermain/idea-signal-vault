@@ -4,6 +4,22 @@ import { createClient } from '@supabase/supabase-js'
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 
+// Debug logging to help identify missing environment variables
+console.log('Supabase Environment Check:', {
+  hasUrl: !!supabaseUrl,
+  hasKey: !!supabaseAnonKey,
+  url: supabaseUrl ? 'Set' : 'Missing',
+  key: supabaseAnonKey ? 'Set' : 'Missing'
+});
+
+if (!supabaseUrl) {
+  throw new Error('VITE_SUPABASE_URL environment variable is missing. Please set up your Supabase environment variables.');
+}
+
+if (!supabaseAnonKey) {
+  throw new Error('VITE_SUPABASE_ANON_KEY environment variable is missing. Please set up your Supabase environment variables.');
+}
+
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     autoRefreshToken: true,
