@@ -1,5 +1,5 @@
 
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/integrations/supabase/client';
 import { PersonaProfile } from '@/types/persona';
 
 export const createPersona = async (persona: Omit<PersonaProfile, 'id' | 'createdAt'>) => {

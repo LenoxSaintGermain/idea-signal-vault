@@ -1,5 +1,5 @@
 
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/integrations/supabase/client';
 import { Idea, Contribution } from '@/types';
 
 const ADMIN_EMAIL = 'lenox.paris@outlook.com';
