@@ -35,22 +35,21 @@ const AuthForm = () => {
         });
       }
     } catch (error: any) {
-      console.error('Auth error:', error);
-      
-      let errorMessage = error.message;
-      
-      if (error.message?.includes('Invalid login credentials')) {
+      // Handle auth errors gracefully without noisy console errors
+      let errorMessage = error?.message || 'An unexpected error occurred.';
+
+      if (errorMessage.includes('Invalid login credentials')) {
         errorMessage = 'Invalid email or password.';
-      } else if (error.message?.includes('Email not confirmed')) {
+      } else if (errorMessage.includes('Email not confirmed')) {
         errorMessage = 'Please check your email and confirm your account.';
-      } else if (error.message?.includes('User already registered')) {
+      } else if (errorMessage.includes('User already registered')) {
         errorMessage = 'An account with this email already exists.';
       }
-      
+
       toast({
-        title: "Authentication failed",
+        title: 'Authentication failed',
         description: errorMessage,
-        variant: "destructive",
+        variant: 'destructive',
       });
     } finally {
       setLoading(false);

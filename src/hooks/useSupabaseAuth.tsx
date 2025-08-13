@@ -38,7 +38,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       
       return userProfile;
     } catch (error) {
-      console.error('Error loading user profile:', error);
+      console.warn('User profile load failed (non-blocking):', error);
       return null;
     }
   };
