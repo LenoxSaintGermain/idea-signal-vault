@@ -16,7 +16,6 @@ import { supabaseMigrationService } from '@/services/supabaseMigrationService';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/hooks/use-toast';
 import AdminPanel from './AdminPanel';
-import { isAdmin } from '@/services/supabaseUserService';
 import { Link } from 'react-router-dom';
 
 const Dashboard = () => {
@@ -229,13 +228,13 @@ const Dashboard = () => {
         )}
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className={`grid w-full ${isAdmin(user) ? 'grid-cols-6' : 'grid-cols-5'} lg:w-auto`}>
+          <TabsList className={`grid w-full ${user?.isAdmin ? 'grid-cols-6' : 'grid-cols-5'} lg:w-auto`}>
             <TabsTrigger value="pain-points">Pain Points</TabsTrigger>
             <TabsTrigger value="explore">Ideas</TabsTrigger>
             <TabsTrigger value="formatter">AI Formatter</TabsTrigger>
             <TabsTrigger value="my-contributions">My Contributions</TabsTrigger>
             <TabsTrigger value="activity">Activity</TabsTrigger>
-            {isAdmin(user) && (
+            {user?.isAdmin && (
               <TabsTrigger value="admin" className="bg-red-50 text-red-700 data-[state=active]:bg-red-600 data-[state=active]:text-white">
                 Admin
               </TabsTrigger>
@@ -302,10 +301,10 @@ const Dashboard = () => {
               <p className="text-gray-600">Your Signal Point earning history</p>
             </div>
             
-            <ActivityFeed />
+            <ActivityFeed currentUserId={supabaseUser?.id} />
           </TabsContent>
 
-          {isAdmin(user) && (
+          {user?.isAdmin && (
             <TabsContent value="admin" className="space-y-6">
               <AdminPanel />
             </TabsContent>

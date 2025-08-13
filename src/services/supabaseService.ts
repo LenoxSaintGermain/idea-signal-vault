@@ -243,13 +243,39 @@ export const getAllActivities = async (limitCount: number = 100) => {
   }));
 };
 
-export const subscribeToActivities = (callback: (activities: any[]) => void, limitCount: number = 20) => {
+export const getAllActivitiesForUser = async (userId: string, limitCount: number = 100) => {
+  const { data, error } = await supabase
+    .from('user_activities')
+    .select('*')
+    .eq('user_id', userId)
+    .order('timestamp', { ascending: false })
+    .limit(limitCount);
+
+  if (error) throw error;
+
+  return data.map(row => ({
+    id: row.id,
+    userId: row.user_id,
+    ideaId: row.idea_id,
+    action: row.action,
+    points: row.points,
+    timestamp: row.timestamp
+  }));
+};
+
+export const subscribeToActivities = (
+  callback: (activities: any[]) => void, 
+  limitCount: number = 20,
+  userId?: string
+) => {
   const subscription = supabase
     .channel('user_activities_changes')
     .on('postgres_changes', 
       { event: '*', schema: 'public', table: 'user_activities' },
       async () => {
-        const activities = await getAllActivities(limitCount);
+        const activities = userId 
+          ? await getAllActivitiesForUser(userId, limitCount)
+          : await getAllActivities(limitCount);
         callback(activities);
       }
     )

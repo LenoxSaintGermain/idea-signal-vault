@@ -24,7 +24,12 @@ interface EnrichedActivity extends Activity {
   userInitials: string;
 }
 
-const ActivityFeed = ({ isAdminView = false }: { isAdminView?: boolean }) => {
+interface ActivityFeedProps {
+  isAdminView?: boolean;
+  currentUserId?: string;
+}
+
+const ActivityFeed = ({ isAdminView = false, currentUserId }: ActivityFeedProps) => {
   const [activities, setActivities] = useState<EnrichedActivity[]>([]);
   const [loading, setLoading] = useState(true);
   const [users, setUsers] = useState<Record<string, User>>({});
@@ -74,10 +79,10 @@ const ActivityFeed = ({ isAdminView = false }: { isAdminView?: boolean }) => {
 
       setActivities(enrichedActivities);
       setLoading(false);
-    }, isAdminView ? 50 : 20);
+    }, isAdminView ? 50 : 20, !isAdminView ? currentUserId : undefined);
 
     return unsubscribe;
-  }, [users, ideas, isAdminView]);
+  }, [users, ideas, isAdminView, currentUserId]);
 
   const getActionIcon = (action: string) => {
     switch (action) {

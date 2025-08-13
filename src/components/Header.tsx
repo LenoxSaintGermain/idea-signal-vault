@@ -3,7 +3,6 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/hooks/useSupabaseAuth';
 import { TrendingUp, Coins, Lightbulb, Shield, Users } from 'lucide-react';
-import { isAdmin } from '@/services/supabaseUserService';
 import { Link } from 'react-router-dom';
 
 const Header = () => {
@@ -54,7 +53,7 @@ const Header = () => {
               </nav>
             )}
             
-            {user && isAdmin(user) && (
+            {user?.isAdmin && (
               <Badge className="bg-red-600 hover:bg-red-700 text-white">
                 <Shield className="w-3 h-3 mr-1" />
                 Admin
