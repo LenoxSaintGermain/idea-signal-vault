@@ -29,7 +29,7 @@ export const formatPainPoint = async (apiKey: string, rawIdea: string): Promise<
     throw new Error('OpenAI API key is required');
   }
 
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+  const response = await fetch('https://api.openai.com/v1/responses', {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${apiKey}`,
@@ -37,27 +37,65 @@ export const formatPainPoint = async (apiKey: string, rawIdea: string): Promise<
     },
     body: JSON.stringify({
       model: 'gpt-4o-mini',
-      messages: [
+      input: [
         {
           role: 'system',
-          content: PAIN_POINT_SYSTEM_PROMPT
+          content: [
+            {
+              type: 'input_text',
+              text: PAIN_POINT_SYSTEM_PROMPT
+            }
+          ]
         },
         {
           role: 'user',
-          content: `Format this raw idea into a Pain Point Gallery card: ${rawIdea}`
+          content: [
+            {
+              type: 'input_text',
+              text: `Format this raw idea into a Pain Point Gallery card: ${rawIdea}`
+            }
+          ]
         }
       ],
+      response_format: {
+        type: 'json_schema',
+        json_schema: {
+          name: 'pain_point_card',
+          strict: true,
+          schema: {
+            type: 'object',
+            additionalProperties: false,
+            properties: {
+              headline: { type: 'string' },
+              subheadline: { type: 'string' },
+              tags: {
+                type: 'array',
+                minItems: 3,
+                maxItems: 5,
+                items: { type: 'string' }
+              },
+              solution: { type: 'string' },
+              cta: { type: 'string' }
+            },
+            required: ['headline', 'subheadline', 'tags', 'solution', 'cta']
+          }
+        }
+      },
       temperature: 0.8,
-      max_tokens: 500,
+      max_output_tokens: 500
     }),
   });
 
   if (!response.ok) {
-    throw new Error('Failed to format pain point');
+    const errorText = await response.text();
+    throw new Error(`Failed to format pain point: ${errorText}`);
   }
 
   const data = await response.json();
-  const content = data.choices[0]?.message?.content;
+  const content =
+    data.output_text ??
+    data.output?.[0]?.content?.find((item: { type: string; text?: string }) => item.type === 'output_text')
+      ?.text;
   
   if (!content) {
     throw new Error('No content received from OpenAI');
