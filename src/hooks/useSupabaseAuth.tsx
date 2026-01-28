@@ -68,6 +68,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           setUser(null);
         }
         
+        // Force reconnect to apply new auth token
+        await supabase.realtime.disconnect();
+        supabase.realtime.connect();
+
         setLoading(false);
       }
     );
